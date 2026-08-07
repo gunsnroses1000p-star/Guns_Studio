@@ -36,6 +36,7 @@ def build_app() -> gr.Blocks:
             face_swap_tab,
             upscale_tab,
         )
+        from ui.runtime_utils import build_startup_status_markdown
     except Exception as exc:
         print(f"Failed while importing UI modules: {exc!r}", flush=True)
         raise
@@ -49,6 +50,8 @@ A multi-modal AI creative suite — text, images, audio, video,
 face swap, and upscaling.
 """
         )
+        with gr.Accordion("Startup health/status", open=False):
+            gr.Markdown(build_startup_status_markdown())
 
         tab_builders = (
             ("text", text_tab.build),

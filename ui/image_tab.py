@@ -4,6 +4,7 @@ ui/image_tab.py – Gradio tab for image generation.
 
 import gradio as gr
 from providers import image_provider
+from ui.runtime_utils import run_with_ui_error
 from config import (
     IMAGE_MODEL_DEFAULT,
     IMAGE_STEPS_DEFAULT,
@@ -38,15 +39,18 @@ def build() -> gr.Tab:
                 output_image = gr.Image(label="Generated image", type="filepath")
 
         def _generate(prompt, neg, model, steps_val, guidance_val, w, h, seed_val):
-            return image_provider.generate(
-                prompt=prompt,
-                negative_prompt=neg,
-                model_name=model,
-                steps=int(steps_val),
-                guidance_scale=float(guidance_val),
-                width=int(w),
-                height=int(h),
-                seed=int(seed_val),
+            return run_with_ui_error(
+                "Image Generation",
+                lambda: image_provider.generate(
+                    prompt=prompt,
+                    negative_prompt=neg,
+                    model_name=model,
+                    steps=int(steps_val),
+                    guidance_scale=float(guidance_val),
+                    width=int(w),
+                    height=int(h),
+                    seed=int(seed_val),
+                ),
             )
 
         generate_btn.click(

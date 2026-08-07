@@ -5,6 +5,7 @@ ui/audio_tab.py – Gradio tab for TTS and music generation.
 import gradio as gr
 from providers import audio_provider
 from config import TTS_MODEL_DEFAULT, MUSIC_MODEL_DEFAULT, MUSIC_DURATION_DEFAULT
+from ui.runtime_utils import run_with_ui_error
 
 
 def build() -> gr.Tab:
@@ -22,7 +23,10 @@ def build() -> gr.Tab:
                         tts_audio = gr.Audio(label="Speech output", type="filepath")
 
                 tts_btn.click(
-                    lambda text, model: audio_provider.tts(text, model_name=model),
+                    lambda text, model: run_with_ui_error(
+                        "Audio (Text-to-Speech)",
+                        lambda: audio_provider.tts(text, model_name=model),
+                    ),
                     inputs=[tts_text, tts_model],
                     outputs=tts_audio,
                 )
@@ -42,8 +46,11 @@ def build() -> gr.Tab:
                         music_audio = gr.Audio(label="Music output", type="filepath")
 
                 music_btn.click(
-                    lambda prompt, model, dur: audio_provider.generate_music(
-                        prompt, model_name=model, duration=int(dur)
+                    lambda prompt, model, dur: run_with_ui_error(
+                        "Audio (Music Generation)",
+                        lambda: audio_provider.generate_music(
+                            prompt, model_name=model, duration=int(dur)
+                        ),
                     ),
                     inputs=[music_prompt, music_model, music_duration],
                     outputs=music_audio,

@@ -5,6 +5,7 @@ ui/upscale_tab.py – Gradio tab for image upscaling.
 import gradio as gr
 from providers import upscale_provider
 from config import UPSCALE_MODEL_DEFAULT, UPSCALE_STEPS_DEFAULT
+from ui.runtime_utils import run_with_ui_error
 
 
 def build() -> gr.Tab:
@@ -22,8 +23,11 @@ def build() -> gr.Tab:
                 result_image = gr.Image(label="Upscaled image", type="filepath")
 
         def _upscale(image, prompt_val, model, steps_val):
-            return upscale_provider.upscale(
-                image, prompt=prompt_val, model_name=model, steps=int(steps_val)
+            return run_with_ui_error(
+                "Upscale",
+                lambda: upscale_provider.upscale(
+                    image, prompt=prompt_val, model_name=model, steps=int(steps_val)
+                ),
             )
 
         upscale_btn.click(
