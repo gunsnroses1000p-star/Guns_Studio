@@ -4,10 +4,10 @@ ui/runtime_utils.py – Lightweight UI runtime helpers.
 
 from __future__ import annotations
 
-import importlib
 import os
+import sys
 from pathlib import Path
-from typing import Callable, TypeVar
+from typing import Callable, Mapping, TypeVar
 
 import gradio as gr
 
@@ -40,7 +40,9 @@ def run_with_ui_error(
         return error_result
 
 
-def build_startup_status_markdown() -> str:
+def build_startup_status_markdown(
+    tab_import_errors: Mapping[str, Exception] | None = None,
+) -> str:
     lines = ["### 🩺 Startup health", ""]
 
     has_hf_token = bool(os.environ.get("HF_TOKEN"))
@@ -65,12 +67,21 @@ def build_startup_status_markdown() -> str:
         "providers.upscale_provider",
     )
     for module_name in provider_modules:
-        try:
-            importlib.import_module(module_name)
+        if module_name in sys.modules and sys.modules[module_name] is not None:
             lines.append(f"- ✅ `{module_name}` import: ok")
-        except Exception as exc:
+        else:
             lines.append(
-                f"- ⚠️ `{module_name}` import: failed ({exc.__class__.__name__}: {exc})"
+                f"- ⚠️ `{module_name}` import: not loaded "
+                "(related tab may have failed to import)"
+            )
+
+    if tab_import_errors:
+        lines.append("")
+        lines.append("#### Tab availability")
+        for tab_name, exc in tab_import_errors.items():
+            lines.append(
+                f"- ⚠️ `{tab_name}` tab import failed "
+                f"({exc.__class__.__name__}: {exc})"
             )
 
     return "\n".join(lines)
