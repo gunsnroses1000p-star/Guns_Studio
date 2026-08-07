@@ -7,9 +7,7 @@ from __future__ import annotations
 import os
 import uuid
 
-import torch
 from PIL import Image
-from diffusers import StableDiffusionUpscalePipeline
 
 from config import (
     HF_TOKEN,
@@ -20,18 +18,29 @@ from config import (
 
 _pipe = None
 _loaded_model: str = ""
+torch = None
+StableDiffusionUpscalePipeline = None
 
 
 def _load(model_name: str) -> None:
-    global _pipe, _loaded_model
+    global _pipe, _loaded_model, torch, StableDiffusionUpscalePipeline
     if _loaded_model == model_name and _pipe is not None:
         return
+    if torch is None:
+        import torch as _torch
+
+        torch = _torch
+    if StableDiffusionUpscalePipeline is None:
+        from diffusers import StableDiffusionUpscalePipeline as _StableDiffusionUpscalePipeline
+
+        StableDiffusionUpscalePipeline = _StableDiffusionUpscalePipeline
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     _pipe = StableDiffusionUpscalePipeline.from_pretrained(
         model_name,
         torch_dtype=torch.float32,
         token=HF_TOKEN or None,
     )
-    _pipe = _pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+    _pipe = _pipe.to(device)
     _loaded_model = model_name
 
 

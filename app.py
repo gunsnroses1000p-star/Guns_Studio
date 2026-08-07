@@ -12,20 +12,34 @@ Environment variables (optional):
 import os
 
 # IMPORTANT: Import spaces BEFORE torch/diffusers or anything CUDA-related.
-import spaces
-import gradio as gr
+try:
+    import spaces
+except Exception as exc:
+    print(f"Failed while importing spaces: {exc!r}", flush=True)
+    raise
 
-from ui import (
-    text_tab,
-    image_tab,
-    audio_tab,
-    video_tab,
-    face_swap_tab,
-    upscale_tab,
-)
+try:
+    import gradio as gr
+except Exception as exc:
+    print(f"Failed while importing gradio: {exc!r}", flush=True)
+    raise
 
 
 def build_app() -> gr.Blocks:
+    print("Importing UI modules...", flush=True)
+    try:
+        from ui import (
+            text_tab,
+            image_tab,
+            audio_tab,
+            video_tab,
+            face_swap_tab,
+            upscale_tab,
+        )
+    except Exception as exc:
+        print(f"Failed while importing UI modules: {exc!r}", flush=True)
+        raise
+
     with gr.Blocks(title="Guns AI Studio") as demo:
         gr.Markdown(
             """
@@ -36,12 +50,21 @@ face swap, and upscaling.
 """
         )
 
-        text_tab.build()
-        image_tab.build()
-        audio_tab.build()
-        video_tab.build()
-        face_swap_tab.build()
-        upscale_tab.build()
+        tab_builders = (
+            ("text", text_tab.build),
+            ("image", image_tab.build),
+            ("audio", audio_tab.build),
+            ("video", video_tab.build),
+            ("face swap", face_swap_tab.build),
+            ("upscale", upscale_tab.build),
+        )
+        for tab_name, builder in tab_builders:
+            print(f"Building {tab_name} tab...", flush=True)
+            try:
+                builder()
+            except Exception as exc:
+                print(f"Failed while building {tab_name} tab: {exc!r}", flush=True)
+                raise
 
     return demo
 
@@ -49,10 +72,23 @@ face swap, and upscaling.
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
 
-    app = build_app()
+    print(f"Starting Guns AI Studio on port {port}...", flush=True)
 
-    app.launch(
-        server_name="0.0.0.0",
-        server_port=port,
-        share=False,
-    )
+    try:
+        print("Building Gradio app...", flush=True)
+        app = build_app()
+        print("Gradio app built successfully.", flush=True)
+    except Exception as exc:
+        print(f"Startup failed during app construction: {exc!r}", flush=True)
+        raise
+
+    try:
+        print("Launching Gradio app...", flush=True)
+        app.launch(
+            server_name="0.0.0.0",
+            server_port=port,
+            share=False,
+        )
+    except Exception as exc:
+        print(f"Startup failed during app launch: {exc!r}", flush=True)
+        raise

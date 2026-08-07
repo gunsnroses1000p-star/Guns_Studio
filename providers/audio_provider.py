@@ -6,11 +6,6 @@ from __future__ import annotations
 
 import os
 import uuid
-import numpy as np
-import soundfile as sf
-
-import torch
-from transformers import pipeline as hf_pipeline
 
 from config import (
     HF_TOKEN,
@@ -22,19 +17,39 @@ from config import (
 
 _tts_pipe = None
 _tts_model: str = ""
+_hf_pipeline = None
 
 _music_model = None
 _music_processor = None
 _music_model_name: str = ""
+torch = None
+np = None
+sf = None
+
+
+def _load_audio_io() -> None:
+    global np, sf
+    if np is None:
+        import numpy as _np
+
+        np = _np
+    if sf is None:
+        import soundfile as _sf
+
+        sf = _sf
 
 
 # ── TTS ─────────────────────────────────────────────────────────────────────
 
 def _load_tts(model_name: str) -> None:
-    global _tts_pipe, _tts_model
+    global _tts_pipe, _tts_model, _hf_pipeline
     if _tts_model == model_name and _tts_pipe is not None:
         return
-    _tts_pipe = hf_pipeline(
+    if _hf_pipeline is None:
+        from transformers import pipeline as _pipeline
+
+        _hf_pipeline = _pipeline
+    _tts_pipe = _hf_pipeline(
         "text-to-speech",
         model=model_name,
         token=HF_TOKEN or None,
@@ -48,6 +63,7 @@ def tts(
 ) -> str:
     """Synthesise speech and return the saved .wav file path."""
     _load_tts(model_name)
+    _load_audio_io()
     result = _tts_pipe(text)
     audio_array = result["audio"]
     sample_rate = result["sampling_rate"]
@@ -63,9 +79,13 @@ def tts(
 # ── Music generation ─────────────────────────────────────────────────────────
 
 def _load_music(model_name: str) -> None:
-    global _music_model, _music_processor, _music_model_name
+    global _music_model, _music_processor, _music_model_name, torch
     if _music_model_name == model_name and _music_model is not None:
         return
+    if torch is None:
+        import torch as _torch
+
+        torch = _torch
     from transformers import AutoProcessor, MusicgenForConditionalGeneration
 
     _music_processor = AutoProcessor.from_pretrained(
@@ -84,6 +104,7 @@ def generate_music(
 ) -> str:
     """Generate music and return the saved .wav file path."""
     _load_music(model_name)
+    _load_audio_io()
     inputs = _music_processor(text=[prompt], padding=True, return_tensors="pt")
     tokens_per_sec = _music_model.config.audio_encoder.frame_rate
     max_new_tokens = int(duration * tokens_per_sec)

@@ -11,13 +11,11 @@ import os
 import uuid
 from pathlib import Path
 
-import cv2
-import numpy as np
-
 from config import FACE_SWAP_MODEL, OUTPUT_DIR
 
 _app = None
 _swapper = None
+cv2 = None
 
 
 def _load() -> None:
@@ -42,7 +40,12 @@ def _load() -> None:
 
 def swap(source_image_path: str, target_image_path: str) -> str:
     """Swap the face from *source* onto *target* and return the output path."""
+    global cv2
     _load()
+    if cv2 is None:
+        import cv2 as _cv2
+
+        cv2 = _cv2
 
     source = cv2.imread(source_image_path)
     target = cv2.imread(target_image_path)
