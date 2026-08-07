@@ -1,0 +1,14 @@
+gradio>=4.0.0
+torch>=2.0.0
+transformers>=4.38.0
+diffusers>=0.27.0
+accelerate>=0.28.0
+huggingface_hub>=0.21.0
+Pillow>=10.0.0
+scipy>=1.12.0
+soundfile>=0.12.1
+opencv-python-headless>=4.9.0
+insightface>=0.7.3
+onnxruntime>=1.17.0
+imageio>=2.34.0
+imageio-ffmpeg>=0.4.9

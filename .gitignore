@@ -216,3 +216,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Guns AI Studio – generated outputs
+outputs/*
+!outputs/.gitkeep
+
+# Local model weights
+models/
+*.onnx
+*.pt
+*.pth
+*.bin
+*.safetensors
