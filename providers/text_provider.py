@@ -4,10 +4,8 @@ providers/text_provider.py – Text generation via a causal-LM pipeline.
 
 from __future__ import annotations
 
-from typing import Iterator
-
-from transformers import pipeline, TextIteratorStreamer
 import threading
+from typing import Iterator
 
 from config import (
     HF_TOKEN,
@@ -19,13 +17,19 @@ from config import (
 
 _pipe = None
 _loaded_model: str = ""
+_pipeline = None
+_text_iterator_streamer = None
 
 
 def _load(model_name: str) -> None:
-    global _pipe, _loaded_model
+    global _pipe, _loaded_model, _pipeline
     if _loaded_model == model_name and _pipe is not None:
         return
-    _pipe = pipeline(
+    if _pipeline is None:
+        from transformers import pipeline as _hf_pipeline
+
+        _pipeline = _hf_pipeline
+    _pipe = _pipeline(
         "text-generation",
         model=model_name,
         token=HF_TOKEN or None,
@@ -62,9 +66,18 @@ def stream(
     top_p: float = TEXT_TOP_P,
 ) -> Iterator[str]:
     """Yield tokens one-by-one for streaming UIs."""
+    global _text_iterator_streamer
     _load(model_name)
+    if _text_iterator_streamer is None:
+        from transformers import TextIteratorStreamer as _TextIteratorStreamer
+
+        _text_iterator_streamer = _TextIteratorStreamer
     tokenizer = _pipe.tokenizer
-    streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+    streamer = _text_iterator_streamer(
+        tokenizer,
+        skip_prompt=True,
+        skip_special_tokens=True,
+    )
     inputs = tokenizer(prompt, return_tensors="pt").to(_pipe.device)
 
     gen_kwargs = dict(

@@ -42,7 +42,16 @@ def _load(model_name: str) -> None:
     if _loaded_model == model_name and _pipe is not None:
         return
 
-    # ...the rest of your existing _load() code...
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    torch_dtype = torch.float16 if device == "cuda" else torch.float32
+    _pipe = StableDiffusionXLPipeline.from_pretrained(
+        model_name,
+        torch_dtype=torch_dtype,
+        token=HF_TOKEN or None,
+    )
+    _pipe.scheduler = DPMSolverMultistepScheduler.from_config(_pipe.scheduler.config)
+    _pipe = _pipe.to(device)
+    _loaded_model = model_name
 
 def generate(
     prompt: str,
@@ -79,4 +88,5 @@ def generate(
 
 def _unique_id() -> str:
     import uuid
+
     return uuid.uuid4().hex[:8]
