@@ -7,9 +7,6 @@ from __future__ import annotations
 import os
 from PIL import Image
 
-from diffusers import StableDiffusionXLPipeline, DPMSolverMultistepScheduler
-import torch
-
 from config import (
     HF_TOKEN,
     IMAGE_MODEL_DEFAULT,
@@ -21,23 +18,31 @@ from config import (
 )
 
 _pipe = None
-_loaded_model: str = ""
+_loaded_model = ""
+torch = None
+StableDiffusionXLPipeline = None
+DPMSolverMultistepScheduler = None
 
 
 def _load(model_name: str) -> None:
     global _pipe, _loaded_model
+    global torch, StableDiffusionXLPipeline, DPMSolverMultistepScheduler
+
+    if torch is None:
+        import torch as _torch
+        from diffusers import (
+            StableDiffusionXLPipeline as _Pipeline,
+            DPMSolverMultistepScheduler as _Scheduler,
+        )
+
+        torch = _torch
+        StableDiffusionXLPipeline = _Pipeline
+        DPMSolverMultistepScheduler = _Scheduler
+
     if _loaded_model == model_name and _pipe is not None:
         return
-    _pipe = StableDiffusionXLPipeline.from_pretrained(
-        model_name,
-        torch_dtype=torch.float16,
-        use_safetensors=True,
-        token=HF_TOKEN or None,
-    )
-    _pipe.scheduler = DPMSolverMultistepScheduler.from_config(_pipe.scheduler.config)
-    _pipe = _pipe.to("cuda" if torch.cuda.is_available() else "cpu")
-    _loaded_model = model_name
 
+    # ...the rest of your existing _load() code...
 
 def generate(
     prompt: str,
