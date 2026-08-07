@@ -10,6 +10,7 @@ Environment variables (optional):
 """
 
 import os
+import importlib
 
 # IMPORTANT: Import spaces BEFORE torch/diffusers or anything CUDA-related.
 try:
@@ -27,18 +28,32 @@ except Exception as exc:
 
 def build_app() -> gr.Blocks:
     print("Importing UI modules...", flush=True)
-    try:
-        from ui import (
-            text_tab,
-            image_tab,
-            audio_tab,
-            video_tab,
-            face_swap_tab,
-            upscale_tab,
-        )
-    except Exception as exc:
-        print(f"Failed while importing UI modules: {exc!r}", flush=True)
-        raise
+    from ui.runtime_utils import build_startup_status_markdown
+
+    tab_modules = (
+        ("text", "ui.text_tab"),
+        ("image", "ui.image_tab"),
+        ("audio", "ui.audio_tab"),
+        ("video", "ui.video_tab"),
+        ("face swap", "ui.face_swap_tab"),
+        ("upscale", "ui.upscale_tab"),
+    )
+    tab_builders = []
+    tab_import_errors = {}
+    for tab_name, module_name in tab_modules:
+        try:
+            module = importlib.import_module(module_name)
+            tab_builders.append((tab_name, module.build))
+        except Exception as exc:
+            print(f"Failed while importing {tab_name} tab module: {exc!r}", flush=True)
+            tab_import_errors[tab_name] = exc
+
+    def _render_unavailable_tab(tab_name: str, exc: Exception, reason: str) -> None:
+        with gr.Tab(f"⚠️ {tab_name.title()} unavailable"):
+            gr.Markdown(
+                f"⚠️ **{tab_name.title()}** {reason}: "
+                f"`{exc.__class__.__name__}: {exc}`"
+            )
 
     with gr.Blocks(title="Guns AI Studio") as demo:
         gr.Markdown(
@@ -49,22 +64,18 @@ A multi-modal AI creative suite — text, images, audio, video,
 face swap, and upscaling.
 """
         )
+        with gr.Accordion("Startup health/status", open=False):
+            gr.Markdown(build_startup_status_markdown(tab_import_errors=tab_import_errors))
 
-        tab_builders = (
-            ("text", text_tab.build),
-            ("image", image_tab.build),
-            ("audio", audio_tab.build),
-            ("video", video_tab.build),
-            ("face swap", face_swap_tab.build),
-            ("upscale", upscale_tab.build),
-        )
         for tab_name, builder in tab_builders:
             print(f"Building {tab_name} tab...", flush=True)
             try:
                 builder()
             except Exception as exc:
                 print(f"Failed while building {tab_name} tab: {exc!r}", flush=True)
-                raise
+                _render_unavailable_tab(tab_name, exc, "is currently unavailable")
+        for tab_name, exc in tab_import_errors.items():
+            _render_unavailable_tab(tab_name, exc, "could not be loaded")
 
     return demo
 

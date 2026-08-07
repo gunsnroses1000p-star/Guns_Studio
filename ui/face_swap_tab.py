@@ -4,6 +4,7 @@ ui/face_swap_tab.py – Gradio tab for face swapping.
 
 import gradio as gr
 from providers import face_swap_provider
+from ui.runtime_utils import run_with_ui_error
 
 
 def build() -> gr.Tab:
@@ -21,7 +22,10 @@ def build() -> gr.Tab:
                 result_img = gr.Image(label="Result", type="filepath")
 
         swap_btn.click(
-            face_swap_provider.swap,
+            lambda source, target: run_with_ui_error(
+                "Face Swap",
+                lambda: face_swap_provider.swap(source, target),
+            ),
             inputs=[source_img, target_img],
             outputs=result_img,
         )

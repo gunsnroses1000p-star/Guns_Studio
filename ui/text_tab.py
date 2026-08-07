@@ -5,6 +5,7 @@ ui/text_tab.py – Gradio tab for text generation.
 import gradio as gr
 from providers import text_provider
 from config import TEXT_MODEL_DEFAULT, TEXT_MAX_NEW_TOKENS, TEXT_TEMPERATURE, TEXT_TOP_P
+from ui.runtime_utils import run_with_ui_error
 
 
 def build() -> gr.Tab:
@@ -30,12 +31,16 @@ def build() -> gr.Tab:
                 output = gr.Textbox(label="Output", lines=20)
 
         def _generate(prompt, model, max_tok, temp, top_p_val):
-            return text_provider.generate(
-                prompt,
-                model_name=model,
-                max_new_tokens=int(max_tok),
-                temperature=float(temp),
-                top_p=float(top_p_val),
+            return run_with_ui_error(
+                "Text Generation",
+                lambda: text_provider.generate(
+                    prompt,
+                    model_name=model,
+                    max_new_tokens=int(max_tok),
+                    temperature=float(temp),
+                    top_p=float(top_p_val),
+                ),
+                error_result=lambda message: message,
             )
 
         generate_btn.click(

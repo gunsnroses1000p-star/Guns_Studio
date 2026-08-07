@@ -5,6 +5,7 @@ ui/video_tab.py – Gradio tab for text-to-video generation.
 import gradio as gr
 from providers import video_provider
 from config import VIDEO_MODEL_DEFAULT, VIDEO_FRAMES_DEFAULT, VIDEO_FPS_DEFAULT
+from ui.runtime_utils import run_with_ui_error
 
 
 def build() -> gr.Tab:
@@ -23,8 +24,11 @@ def build() -> gr.Tab:
                 output_video = gr.Video(label="Generated video")
 
         def _generate(prompt, model, frames, fps_val):
-            return video_provider.generate(
-                prompt, model_name=model, num_frames=int(frames), fps=int(fps_val)
+            return run_with_ui_error(
+                "Video Generation",
+                lambda: video_provider.generate(
+                    prompt, model_name=model, num_frames=int(frames), fps=int(fps_val)
+                ),
             )
 
         generate_btn.click(
