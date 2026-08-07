@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import uuid
+import spaces
 from pathlib import Path
 from config import FACE_SWAP_MODEL, OUTPUT_DIR
 
@@ -39,7 +40,7 @@ def _load() -> None:
         str(model_path), 
         providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
     )
-
+@spaces.GPU
 def swap(source_image_path: str, target_image_path: str) -> str:
     """Swap the face from *source* onto *target* and return the output path."""
     # Lazy import cv2

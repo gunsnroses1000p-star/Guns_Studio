@@ -1,6 +1,7 @@
 """ providers/text_provider.py – Text generation via a causal-LM pipeline. """
 from __future__ import annotations
 import threading
+import spaces
 from typing import Iterator
 from config import (
     HF_TOKEN, 
@@ -36,7 +37,7 @@ def _load(model_name: str) -> None:
     )
     
     _loaded_model = model_name
-
+@spaces.GPU
 def generate(
     prompt: str, 
     model_name: str = TEXT_MODEL_DEFAULT, 

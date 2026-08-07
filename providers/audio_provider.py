@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import uuid
+import spaces 
 from config import (
     HF_TOKEN, 
     TTS_MODEL_DEFAULT, 
@@ -90,7 +91,7 @@ def _load_music(model_name: str) -> None:
     _music_model = _music_model.to(device).half() if device == "cuda" else _music_model
     
     _music_model_name = model_name
-
+@spaces.GPU
 def generate_music(
     prompt: str, 
     model_name: str = MUSIC_MODEL_DEFAULT, 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import uuid
+import spaces
 from config import (
     HF_TOKEN, 
     VIDEO_MODEL_DEFAULT, 
@@ -44,7 +45,7 @@ def _load(model_name: str) -> None:
         _pipe.enable_vae_slicing() # Prevents crashes during video encoding
         
     _loaded_model = model_name
-
+@spaces.GPU
 def generate(
     prompt: str, 
     model_name: str = VIDEO_MODEL_DEFAULT, 

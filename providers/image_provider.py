@@ -1,6 +1,7 @@
 """ providers/image_provider.py – Text-to-image generation via Diffusers. """
 from __future__ import annotations
 import os
+import spaces
 from PIL import Image
 from config import (
     HF_TOKEN, 
@@ -51,7 +52,7 @@ def _load(model_name: str) -> None:
         _pipe.enable_vae_tiling() 
         
     _loaded_model = model_name
-
+@spaces.GPU
 def generate(
     prompt: str, 
     negative_prompt: str = "", 
