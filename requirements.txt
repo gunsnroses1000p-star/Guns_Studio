@@ -1,0 +1,17 @@
+gradio>=4.0.0
+replicate
+huggingface-hub
+diffusers>=0.27.0
+transformers
+accelerate
+torch
+torchvision
+Pillow
+numpy
+requests
+insightface
+onnxruntime
+fal-client
+opencv-python-headless
+spaces
+ip-adapter

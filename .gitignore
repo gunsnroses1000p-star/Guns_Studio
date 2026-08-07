@@ -216,3 +216,17 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Generated outputs
+outputs/
+!outputs/.gitkeep
+
+# Hugging Face / diffusers model cache
+*.safetensors
+*.bin
+*.pt
+*.ckpt
+
+# ~/.insightface/ is outside the repo — no .gitignore entry needed for it.
+# Ignore a local .insightface/ directory if one is ever created inside the repo.
+.insightface/
