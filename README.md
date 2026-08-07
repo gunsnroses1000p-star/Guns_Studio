@@ -3,7 +3,7 @@ title: Guns Studio
 emoji: 🤖
 colorFrom: purple
 colorTo: blue
-sdk: docker
+sdk: gradio
 pinned: false
 ---
 
