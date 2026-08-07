@@ -10,6 +10,56 @@ Environment variables (optional):
 """
 
 import os
+import socket
+import datetime
+
+
+# ---------------------------------------------------------------------------
+# Startup diagnostics
+# ---------------------------------------------------------------------------
+
+def _print_startup_summary(port: int) -> None:
+    """Print a clear startup summary to aid SSR / port-conflict diagnosis."""
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ssr_backend_port = port + 1  # Gradio SSR uses main_port+1 for the Python backend
+    print(f"\n===== Guns AI Studio Startup at {now} =====", flush=True)
+    print(f"  Intended server port  : {port}", flush=True)
+    print(f"  SSR Python backend    : {ssr_backend_port} (used by Node proxy if SSR is active)", flush=True)
+
+    ssr_env_vars = [
+        "GRADIO_SSR_MODE",
+        "GRADIO_NODE_SERVER_NAME",
+        "GRADIO_SERVER_PORT",
+        "PORT",
+        "HF_SPACES_RUNTIME_TASK_ENVIRONMENT",
+        "SPACE_ID",
+    ]
+    print("  Relevant env vars:", flush=True)
+    for var in ssr_env_vars:
+        val = os.environ.get(var)
+        print(f"    {var} = {val!r}", flush=True)
+
+    _check_port_available(ssr_backend_port)
+    print("==============================================\n", flush=True)
+
+
+def _check_port_available(port: int) -> None:
+    """Non-blocking check: warn if a port is already in use."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(0.5)
+            result = sock.connect_ex(("127.0.0.1", port))
+        if result == 0:
+            print(
+                f"  ⚠  WARNING: Port {port} appears to be OCCUPIED before launch "
+                "(something may conflict with the SSR Python backend).",
+                flush=True,
+            )
+        else:
+            print(f"  ✓  Port {port} is free.", flush=True)
+    except OSError as exc:
+        print(f"  Port {port} check skipped ({exc})", flush=True)
+
 
 # IMPORTANT: Import spaces BEFORE torch/diffusers or anything CUDA-related.
 try:
@@ -72,7 +122,11 @@ face swap, and upscaling.
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
 
+    # Print a clear diagnostic summary before anything else starts.
+    _print_startup_summary(port)
+
     print(f"Starting Guns AI Studio on port {port}...", flush=True)
+    print("(This is the only Gradio launch — no secondary server will be started.)", flush=True)
 
     try:
         print("Building Gradio app...", flush=True)
@@ -88,7 +142,10 @@ if __name__ == "__main__":
             server_name="0.0.0.0",
             server_port=port,
             share=False,
+            show_error=True,       # surface Python-side errors in the UI
+            prevent_thread_lock=False,  # block until the server exits (keeps HF Space alive)
         )
+        print("Gradio app has exited launch().", flush=True)
     except Exception as exc:
         print(f"Startup failed during app launch: {exc!r}", flush=True)
         raise
