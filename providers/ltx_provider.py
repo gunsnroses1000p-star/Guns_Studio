@@ -36,90 +36,7 @@ LTX_NEGATIVE_PROMPT = (
     "deformed face, identity drift"
 )
 
-
 _PIPELINE = None
-
-
-# ============================================================
-# LTX TIMESTEP SCHEDULE
-# ============================================================
-
-def _linear_quadratic_schedule(
-    num_steps: int,
-    threshold_noise: float = 0.025,
-):
-    """
-    LTX's recommended linear/quadratic timestep schedule.
-
-    This is used explicitly so newer Diffusers schedulers do not
-    require a dynamic-shifting `mu` value.
-    """
-
-    linear_steps = num_steps // 2
-
-    if num_steps < 2:
-        return torch.tensor(
-            [1.0],
-            dtype=torch.float32,
-        )
-
-    linear_sigma_schedule = [
-        i * threshold_noise / linear_steps
-        for i in range(linear_steps)
-    ]
-
-    threshold_noise_step_diff = (
-        linear_steps
-        - threshold_noise * num_steps
-    )
-
-    quadratic_steps = (
-        num_steps - linear_steps
-    )
-
-    quadratic_coef = (
-        threshold_noise_step_diff
-        / (linear_steps * quadratic_steps**2)
-    )
-
-    linear_coef = (
-        threshold_noise / linear_steps
-        - (
-            2
-            * threshold_noise_step_diff
-            / quadratic_steps**2
-        )
-    )
-
-    const = quadratic_coef * (
-        linear_steps**2
-    )
-
-    quadratic_sigma_schedule = [
-        quadratic_coef * (i**2)
-        + linear_coef * i
-        + const
-        for i in range(
-            linear_steps,
-            num_steps,
-        )
-    ]
-
-    sigma_schedule = (
-        linear_sigma_schedule
-        + quadratic_sigma_schedule
-        + [1.0]
-    )
-
-    sigma_schedule = [
-        1.0 - x
-        for x in sigma_schedule
-    ]
-
-    return torch.tensor(
-        sigma_schedule[:-1],
-        dtype=torch.float32,
-    )
 
 
 # ============================================================
@@ -143,11 +60,9 @@ def _get_pipeline():
         f"[LTX] Loading model: {LTX_MODEL}"
     )
 
-    _PIPELINE = (
-        LTXConditionPipeline.from_pretrained(
-            LTX_MODEL,
-            torch_dtype=torch.bfloat16,
-        )
+    _PIPELINE = LTXConditionPipeline.from_pretrained(
+        LTX_MODEL,
+        torch_dtype=torch.bfloat16,
     )
 
     _PIPELINE.to("cuda")
@@ -182,6 +97,8 @@ def extend_video(
     The final 81 frames of the source video are used as
     conditioning context.
 
+    LTX frame counts must follow the 8n + 1 pattern.
+
     Seed remains backend-only.
     """
 
@@ -201,6 +118,10 @@ def extend_video(
         raise FileNotFoundError(
             f"Video file not found: {video_path}"
         )
+
+    # --------------------------------------------------------
+    # LOAD SOURCE VIDEO
+    # --------------------------------------------------------
 
     print(
         f"[LTX] Loading source video: "
@@ -226,11 +147,11 @@ def extend_video(
     # --------------------------------------------------------
     # CONDITIONING
     #
-    # LTX requires:
+    # LTX requires frame counts in the form:
     #
-    # 8n + 1 frames
+    # 8n + 1
     #
-    # 81 frames = 8 * 10 + 1
+    # 81 = 8 * 10 + 1
     # --------------------------------------------------------
 
     conditioning_frames = 81
@@ -253,13 +174,9 @@ def extend_video(
 
     width, height = first_frame.size
 
-    width = width - (
-        width % 32
-    )
-
-    height = height - (
-        height % 32
-    )
+    # LTX works best with dimensions divisible by 32.
+    width = width - (width % 32)
+    height = height - (height % 32)
 
     if width < 256 or height < 256:
         raise ValueError(
@@ -267,10 +184,7 @@ def extend_video(
             "for LTX."
         )
 
-    if first_frame.size != (
-        width,
-        height,
-    ):
+    if first_frame.size != (width, height):
 
         conditioning_video = [
             frame.resize(
@@ -295,27 +209,45 @@ def extend_video(
     if extension_frames < 81:
         extension_frames = 81
 
+    # Force extension length to 8n + 1.
     extension_frames = (
         (
-            (extension_frames - 1)
-            // 8
-        )
-        * 8
+            (extension_frames - 1) // 8
+        ) * 8
     ) + 1
 
+    # The first conditioning frame overlaps with the
+    # generated continuation, so subtract one frame.
+    #
+    # Example:
+    #
+    # conditioning = 81
+    # extension = 81
+    #
+    # total = 81 + 81 - 1 = 161
+    #
+    # 161 = 8 * 20 + 1
+    #
     total_frames = (
         conditioning_frames
         + extension_frames
         - 1
     )
 
-    total_frames = (
-        total_frames // 8
-    ) * 8
+    # Safety check: LTX frame count must be 8n + 1.
+    if (total_frames - 1) % 8 != 0:
+        total_frames = (
+            ((total_frames - 1) // 8) * 8
+        ) + 1
 
     print(
         f"[LTX] Conditioning frames: "
         f"{conditioning_frames}"
+    )
+
+    print(
+        f"[LTX] Extension frames: "
+        f"{extension_frames}"
     )
 
     print(
@@ -346,22 +278,25 @@ def extend_video(
     )
 
     # --------------------------------------------------------
-    # EXPLICIT LTX TIMESTEPS
+    # GENERATION
     #
-    # This avoids the dynamic-shifting `mu` error.
+    # IMPORTANT:
+    #
+    # Do NOT manually pass timesteps here.
+    #
+    # Current Diffusers versions use the scheduler's own
+    # timestep handling. Passing our old custom timestep
+    # schedule triggers:
+    #
+    # ValueError:
+    # `mu` must be passed when `use_dynamic_shifting`
+    # is set to be `True`
     # --------------------------------------------------------
 
     num_inference_steps = 30
 
-    timesteps = (
-        _linear_quadratic_schedule(
-            num_inference_steps
-        )
-        * 1000.0
-    )
-
     print(
-        "[LTX] Using explicit LTX timestep schedule."
+        "[LTX] Using scheduler default timestep handling."
     )
 
     print(
@@ -377,7 +312,6 @@ def extend_video(
         num_frames=total_frames,
         frame_rate=LTX_FPS,
         num_inference_steps=num_inference_steps,
-        timesteps=timesteps,
         guidance_scale=1.0,
         image_cond_noise_scale=0.025,
         decode_timestep=0.05,
@@ -385,12 +319,20 @@ def extend_video(
         generator=generator,
     )
 
+    # --------------------------------------------------------
+    # EXTRACT FRAMES
+    # --------------------------------------------------------
+
     frames = result.frames[0]
 
     if not frames:
         raise RuntimeError(
             "LTX returned no frames."
         )
+
+    print(
+        f"[LTX] Generated {len(frames)} frames."
+    )
 
     # --------------------------------------------------------
     # SAVE OUTPUT
