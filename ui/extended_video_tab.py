@@ -6,7 +6,7 @@ Guns AI Studio - LTX Extended Video tab.
 
 import gradio as gr
 
-from providers.ltx_providers import extend_video
+from providers.ltx_provider import extend_video
 
 
 def build():
