@@ -5,18 +5,9 @@ app.py – Guns AI Studio entrypoint.
 import os
 
 import gradio as gr
-# ZeroGPU startup compatibility.
-# The actual Img2Img work is handled by Hugging Face inference.
-try:
-    import spaces
 
-    @spaces.GPU(duration=1)
-    def _zerogpu_startup_check():
-        return None
-
-except ImportError:
-    pass
 from ui import img2img_tab
+from ui import image_to_video_tab
 
 
 def build_app() -> gr.Blocks:
@@ -35,6 +26,9 @@ def build_app() -> gr.Blocks:
 
             with gr.Tab("🖌️ Img2Img"):
                 img2img_tab.build()
+
+            with gr.Tab("🎥 Image to Video"):
+                image_to_video_tab.build()
 
     return demo
 
