@@ -1,7 +1,4 @@
 
-Guns N Roses <gunsnroses1000p@gmail.com>
-21:33 (0 minutes ago)
-to me
 
 """
 ui/img2img_tab.py
