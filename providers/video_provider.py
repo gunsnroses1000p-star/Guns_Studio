@@ -1,73 +1,270 @@
-""" providers/video_provider.py – Text-to-video generation via Diffusers. """
+"""
+providers/video_provider.py
+
+HunyuanVideo 1.5 Image-to-Video backend.
+
+User-facing controls:
+    - Source image
+    - Motion prompt
+
+All technical settings remain backend-only.
+"""
+
 from __future__ import annotations
+
 import os
 import uuid
+
 import spaces
-from config import (
-    HF_TOKEN, 
-    VIDEO_MODEL_DEFAULT, 
-    VIDEO_FRAMES_DEFAULT, 
-    VIDEO_FPS_DEFAULT, 
-    OUTPUT_DIR,
+import torch
+
+from PIL import Image, ImageOps
+from diffusers import (
+    HunyuanVideo15ImageToVideoPipeline,
+)
+from diffusers.utils import export_to_video
+
+
+# =========================================================
+# MODEL
+# =========================================================
+
+MODEL_ID = (
+    "hunyuanvideo-community/"
+    "HunyuanVideo-1.5-Diffusers-480p_i2v_step_distilled"
 )
 
-# Global variables to store the model and current state
+OUTPUT_DIR = "outputs"
+
+
+# =========================================================
+# HIDDEN BACKEND SETTINGS
+# =========================================================
+
+NUM_FRAMES = 121
+NUM_INFERENCE_STEPS = 12
+FPS = 24
+
+MAX_DIMENSION = 832
+
+
+# =========================================================
+# PIPELINE CACHE
+# =========================================================
+
 _pipe = None
-_loaded_model: str = ""
 
-def _load(model_name: str) -> None:
-    global _pipe, _loaded_model
-    
-    # 1. If the correct model is already loaded, do nothing
-    if _loaded_model == model_name and _pipe is not None:
-        return
 
-    # 2. Lazy import torch and diffusers ONLY when needed
-    import torch
-    from diffusers import DiffusionPipeline
-    
-    print(f"Loading video model {model_name} into VRAM... please wait.")
-    
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    torch_dtype = torch.float16 if device == "cuda" else torch.float32
-    
-    # 3. Load the pipeline
-    _pipe = DiffusionPipeline.from_pretrained(
-        model_name, 
-        torch_dtype=torch_dtype, 
-        token=HF_TOKEN or None,
-    )
-    _pipe = _pipe.to(device)
-    
-    # 4. Optional: Enable memory optimizations for RTX 6000
-    if device == "cuda":
-        _pipe.enable_model_cpu_offload() # Saves huge amounts of VRAM
-        _pipe.enable_vae_slicing() # Prevents crashes during video encoding
-        
-    _loaded_model = model_name
-@spaces.GPU
-def generate(
-    prompt: str, 
-    model_name: str = VIDEO_MODEL_DEFAULT, 
-    num_frames: int = VIDEO_FRAMES_DEFAULT, 
-    fps: int = VIDEO_FPS_DEFAULT,
-) -> str:
-    """Generate a short video and return the saved .mp4 file path."""
+# =========================================================
+# LOAD PIPELINE
+# =========================================================
+
+def _load_pipeline():
+
     global _pipe
-    
-    # Ensure model is loaded
-    _load(model_name)
-    
-    # Lazy import imageio
-    import imageio
-    
-    # Run the pipeline
-    result = _pipe(prompt, num_frames=num_frames)
-    frames = result.frames[0] # list of PIL Images
-    
-    # Save the file
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    out_path = os.path.join(OUTPUT_DIR, f"video_{uuid.uuid4().hex[:8]}.mp4")
-    imageio.mimsave(out_path, frames, fps=fps)
-    
-    return out_path
+
+    if _pipe is not None:
+        return _pipe
+
+    print(
+        f"Loading HunyuanVideo 1.5: {MODEL_ID}",
+        flush=True,
+    )
+
+    dtype = torch.bfloat16
+
+    _pipe = (
+        HunyuanVideo15ImageToVideoPipeline
+        .from_pretrained(
+            MODEL_ID,
+            torch_dtype=dtype,
+        )
+    )
+
+    # Keep most of the model in CPU memory and move
+    # components to the GPU as needed.
+    _pipe.enable_model_cpu_offload()
+
+    try:
+        _pipe.vae.enable_tiling()
+    except Exception as exc:
+        print(
+            f"VAE tiling unavailable: {exc}",
+            flush=True,
+        )
+
+    print(
+        "HunyuanVideo 1.5 ready.",
+        flush=True,
+    )
+
+    return _pipe
+
+
+# =========================================================
+# IMAGE PREPARATION
+# =========================================================
+
+def _prepare_image(
+    image: Image.Image,
+) -> Image.Image:
+
+    image = ImageOps.exif_transpose(image)
+    image = image.convert("RGB")
+
+    width, height = image.size
+
+    if width <= 0 or height <= 0:
+        raise ValueError(
+            "Invalid source image."
+        )
+
+    # Preserve the original aspect ratio.
+    scale = min(
+        MAX_DIMENSION / max(width, height),
+        1.0,
+    )
+
+    new_width = max(
+        64,
+        int(width * scale),
+    )
+
+    new_height = max(
+        64,
+        int(height * scale),
+    )
+
+    # Hunyuan/Diffusion dimensions should be divisible
+    # by 8.
+    new_width = max(
+        64,
+        (new_width // 8) * 8,
+    )
+
+    new_height = max(
+        64,
+        (new_height // 8) * 8,
+    )
+
+    print(
+        f"Video source: "
+        f"{width}x{height} -> "
+        f"{new_width}x{new_height}",
+        flush=True,
+    )
+
+    return image.resize(
+        (new_width, new_height),
+        Image.Resampling.LANCZOS,
+    )
+
+
+# =========================================================
+# IMAGE → VIDEO
+# =========================================================
+
+@spaces.GPU(duration=180)
+def generate_video(
+    image: Image.Image,
+    prompt: str,
+) -> str:
+
+    if image is None:
+        raise ValueError(
+            "Please upload a source image."
+        )
+
+    if not prompt or not prompt.strip():
+        raise ValueError(
+            "Please describe the motion you want."
+        )
+
+    prompt = prompt.strip()
+
+    pipe = _load_pipeline()
+
+    source = _prepare_image(image)
+
+    # -----------------------------------------------------
+    # Internal random seed.
+    # Never exposed to the user.
+    # -----------------------------------------------------
+
+    seed = torch.randint(
+        0,
+        2**31 - 1,
+        (1,),
+    ).item()
+
+    generator = torch.Generator(
+        device="cuda"
+    ).manual_seed(seed)
+
+    # -----------------------------------------------------
+    # Motion instruction.
+    # Keep the source image and identity stable.
+    # -----------------------------------------------------
+
+    video_prompt = (
+        f"{prompt}. "
+        "Preserve the same person, face, identity, "
+        "clothing, environment, camera framing and "
+        "overall composition from the source image. "
+        "Create natural realistic motion. "
+        "Maintain realistic human anatomy and facial "
+        "features throughout the video. "
+        "No morphing, no identity drift, no melting, "
+        "no sudden scene changes."
+    )
+
+    print(
+        f"Hunyuan I2V prompt: {prompt}",
+        flush=True,
+    )
+
+    print(
+        f"Hunyuan seed: {seed}",
+        flush=True,
+    )
+
+    # -----------------------------------------------------
+    # Generate
+    # -----------------------------------------------------
+
+    result = pipe(
+        image=source,
+        prompt=video_prompt,
+        generator=generator,
+        num_frames=NUM_FRAMES,
+        num_inference_steps=NUM_INFERENCE_STEPS,
+    )
+
+    frames = result.frames[0]
+
+    # -----------------------------------------------------
+    # Save video
+    # -----------------------------------------------------
+
+    os.makedirs(
+        OUTPUT_DIR,
+        exist_ok=True,
+    )
+
+    output_path = os.path.join(
+        OUTPUT_DIR,
+        f"hunyuan_i2v_{uuid.uuid4().hex[:10]}.mp4",
+    )
+
+    export_to_video(
+        frames,
+        output_path,
+        fps=FPS,
+    )
+
+    print(
+        f"Hunyuan video complete: {output_path}",
+        flush=True,
+    )
+
+    return output_path
