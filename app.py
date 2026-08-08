@@ -20,8 +20,7 @@ except ImportError:
 
 from ui import img2img_tab
 from ui import image_to_video_tab
-
-from providers.wan_lightning_test import test_wan_lightning
+from ui import extended_video_tab
 
 
 def build_app() -> gr.Blocks:
@@ -54,6 +53,16 @@ def build_app() -> gr.Blocks:
             with gr.Tab("🎥 Image to Video"):
 
                 image_to_video_tab.build()
+
+
+            # =================================================
+            # EXTENDED VIDEO — LTX
+            # =================================================
+
+            with gr.Tab("⏩ Extended Video"):
+
+                extended_video_tab.build()
+
 
     return demo
 
