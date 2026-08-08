@@ -1,10 +1,13 @@
 """
 providers/img2img_provider.py
 
-Hugging Face RealVisXL Img2Img backend.
+Hugging Face SDXL InstructPix2Pix backend.
 
-User-facing controls are intentionally kept simple.
-All generation parameters remain backend-only.
+The user supplies only:
+    - source image
+    - editing instruction
+
+All technical generation settings remain backend-only.
 """
 
 from __future__ import annotations
@@ -14,38 +17,52 @@ import uuid
 
 import spaces
 import torch
-from PIL import Image
+from PIL import Image, ImageOps
 
 
 # =========================================================
-# BACKEND CONFIGURATION
+# MODEL
 # =========================================================
 
-MODEL_ID = "SG161222/RealVisXL_V4.0"
-
-# Hidden backend defaults.
-STRENGTH = 0.55
-STEPS = 30
-GUIDANCE = 5.5
-
-NEGATIVE_PROMPT = (
-    "blurry, low quality, low resolution, distorted face, "
-    "deformed face, bad anatomy, extra fingers, malformed hands, "
-    "duplicate person, duplicate face, mutated hands, "
-    "cartoon, anime, CGI, 3d render, digital painting, "
-    "plastic skin, wax skin, doll skin, porcelain skin, "
-    "overprocessed face, beauty filter, airbrushed skin, "
-    "oversized eyes, oversized lips, asymmetrical eyes, "
-    "distorted eyes, unnatural skin texture"
-)
+MODEL_ID = "diffusers/sdxl-instructpix2pix-768"
 
 OUTPUT_DIR = "outputs"
+
+
+# =========================================================
+# HIDDEN BACKEND SETTINGS
+# =========================================================
+
+STEPS = 30
+
+# How strongly the written instruction influences the edit.
+GUIDANCE_SCALE = 4.0
+
+# How strongly the original image is preserved.
+IMAGE_GUIDANCE_SCALE = 1.5
+
+# Internal negative prompt.
+NEGATIVE_PROMPT = (
+    "blurry, low quality, low resolution, "
+    "distorted face, deformed face, bad anatomy, "
+    "extra fingers, malformed hands, duplicate person, "
+    "duplicate face, distorted eyes, asymmetrical eyes, "
+    "cartoon, anime, CGI, 3d render, digital painting, "
+    "plastic skin, wax skin, doll skin, porcelain skin, "
+    "overprocessed skin, beauty filter, airbrushed skin, "
+    "unnatural skin texture"
+)
+
+
+# =========================================================
+# PIPELINE CACHE
+# =========================================================
 
 _pipe = None
 
 
 # =========================================================
-# MODEL LOADING
+# LOAD MODEL
 # =========================================================
 
 def _load_pipeline():
@@ -55,8 +72,8 @@ def _load_pipeline():
         return _pipe
 
     from diffusers import (
-        StableDiffusionXLImg2ImgPipeline,
-        DPMSolverMultistepScheduler,
+        StableDiffusionXLInstructPix2PixPipeline,
+        EulerAncestralDiscreteScheduler,
     )
 
     print(
@@ -64,39 +81,35 @@ def _load_pipeline():
         flush=True,
     )
 
-    hf_token = os.environ.get("HF_TOKEN")
-
     dtype = (
         torch.float16
         if torch.cuda.is_available()
         else torch.float32
     )
 
-    _pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+    _pipe = StableDiffusionXLInstructPix2PixPipeline.from_pretrained(
         MODEL_ID,
         torch_dtype=dtype,
-        token=hf_token or None,
     )
 
-    # DPM++ 2M Karras is a strong general-purpose choice
-    # for realistic SDXL generation.
-    _pipe.scheduler = DPMSolverMultistepScheduler.from_config(
-        _pipe.scheduler.config,
-        use_karras_sigmas=True,
+    _pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(
+        _pipe.scheduler.config
     )
 
     if torch.cuda.is_available():
+
         _pipe.enable_model_cpu_offload()
 
         try:
             _pipe.enable_vae_tiling()
         except Exception:
             pass
+
     else:
         _pipe.to("cpu")
 
     print(
-        "RealVisXL Img2Img pipeline ready.",
+        "SDXL InstructPix2Pix ready.",
         flush=True,
     )
 
@@ -104,15 +117,14 @@ def _load_pipeline():
 
 
 # =========================================================
-# IMAGE PREPARATION
+# PREPARE SOURCE IMAGE
 # =========================================================
 
-def _prepare_image(image: Image.Image) -> Image.Image:
-    """
-    Preserve the source aspect ratio while keeping the image
-    at a sensible SDXL resolution.
-    """
+def _prepare_image(
+    image: Image.Image,
+) -> Image.Image:
 
+    image = ImageOps.exif_transpose(image)
     image = image.convert("RGB")
 
     width, height = image.size
@@ -120,20 +132,28 @@ def _prepare_image(image: Image.Image) -> Image.Image:
     if width <= 0 or height <= 0:
         raise ValueError("Invalid source image.")
 
-    # Keep the original aspect ratio.
-    max_dimension = 1024
+    # Keep aspect ratio.
+    # SDXL InstructPix2Pix works around 768px well.
+    max_dimension = 768
 
     scale = min(
         max_dimension / max(width, height),
         1.0,
     )
 
-    new_width = int(width * scale)
-    new_height = int(height * scale)
+    new_width = max(
+        64,
+        int(width * scale),
+    )
 
-    # SDXL works best with dimensions divisible by 8.
-    new_width = max(64, (new_width // 8) * 8)
-    new_height = max(64, (new_height // 8) * 8)
+    new_height = max(
+        64,
+        int(height * scale),
+    )
+
+    # Diffusion dimensions should be divisible by 8.
+    new_width = (new_width // 8) * 8
+    new_height = (new_height // 8) * 8
 
     return image.resize(
         (new_width, new_height),
@@ -142,7 +162,7 @@ def _prepare_image(image: Image.Image) -> Image.Image:
 
 
 # =========================================================
-# IMG2IMG GENERATION
+# GENERATE EDIT
 # =========================================================
 
 @spaces.GPU
@@ -158,7 +178,7 @@ def generate_img2img(
 
     if not prompt or not prompt.strip():
         raise ValueError(
-            "Please enter a prompt."
+            "Please describe the change you want."
         )
 
     prompt = prompt.strip()
@@ -167,29 +187,52 @@ def generate_img2img(
 
     source = _prepare_image(image)
 
-    # Random seed is deliberately generated internally.
-    # The user never sees or controls it.
+    # -----------------------------------------------------
+    # Internal random seed.
+    # Never exposed to the user.
+    # -----------------------------------------------------
+
     seed = torch.randint(
         0,
         2**31 - 1,
         (1,),
     ).item()
 
+    device = (
+        "cuda"
+        if torch.cuda.is_available()
+        else "cpu"
+    )
+
     generator = torch.Generator(
-        device="cuda" if torch.cuda.is_available() else "cpu"
+        device=device
     ).manual_seed(seed)
 
+    # -----------------------------------------------------
+    # Strengthen the editing instruction without changing
+    # what the user asked for.
+    # -----------------------------------------------------
+
+    edit_prompt = (
+        f"{prompt}. "
+        "Make the requested change clearly and accurately. "
+        "Keep the identity, composition, and all unrelated "
+        "details of the original image unchanged whenever "
+        "the instruction does not ask for them to change. "
+        "Maintain a photorealistic natural appearance."
+    )
+
     print(
-        f"Generating Img2Img | seed={seed}",
+        f"Img2Img instruction: {prompt}",
         flush=True,
     )
 
     result = pipe(
-        prompt=prompt,
+        prompt=edit_prompt,
         negative_prompt=NEGATIVE_PROMPT,
         image=source,
-        strength=STRENGTH,
-        guidance_scale=GUIDANCE,
+        guidance_scale=GUIDANCE_SCALE,
+        image_guidance_scale=IMAGE_GUIDANCE_SCALE,
         num_inference_steps=STEPS,
         generator=generator,
     )
