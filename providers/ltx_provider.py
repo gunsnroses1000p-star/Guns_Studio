@@ -253,12 +253,52 @@ def extend_video(
     # EXTENSION LENGTH
     # --------------------------------------------------------
 
-    extension_frames = int(
-        extension_frames
-    )
+    # --------------------------------------------------------
+# EXTENSION LENGTH — CONTROLLED TEST
+#
+# Use 81 conditioning frames and generate only 8 new
+# frames beyond the conditioning window.
+#
+# 81 conditioning + 8 new = 89 total frames.
+#
+# At 24 FPS this is about 3.7 seconds total.
+# --------------------------------------------------------
 
-    if extension_frames < 81:
-        extension_frames = 81
+conditioning_frames = 81
+extension_frames = 9
+
+total_frames = (
+    conditioning_frames
+    + extension_frames
+    - 1
+)
+
+# LTX requires 8n + 1 frame counts.
+if (total_frames - 1) % 8 != 0:
+    total_frames = (
+        ((total_frames - 1) // 8) * 8
+    ) + 1
+
+print(
+    f"[LTX] Conditioning frames: "
+    f"{conditioning_frames}"
+)
+
+print(
+    f"[LTX] Extension frames: "
+    f"{extension_frames}"
+)
+
+print(
+    f"[LTX] Target output frames: "
+    f"{total_frames}"
+)
+
+print(
+    f"[LTX] Approximate output duration: "
+    f"{total_frames / LTX_FPS:.2f} seconds"
+)
+
 
     # Force extension length to 8n + 1.
     extension_frames = (
