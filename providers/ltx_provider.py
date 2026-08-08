@@ -421,4 +421,4 @@ def extend_video(
         f"{output_path}"
     )
 
-    return str(output_path)"""
+    return str(output_path)
