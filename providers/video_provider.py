@@ -154,7 +154,7 @@ def _prepare_image(
 # IMAGE → VIDEO
 # =========================================================
 
-@spaces.GPU(duration=300)
+@spaces.GPU(duration=900)
 def generate_video(
     image: Image.Image,
     prompt: str,
