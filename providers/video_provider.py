@@ -1,7 +1,7 @@
 """
 providers/video_provider.py
 
-HunyuanVideo 1.5 Image-to-Video backend.
+Wan 2.2 Image-to-Video backend.
 
 User-facing controls:
     - Source image
@@ -19,9 +19,7 @@ import spaces
 import torch
 
 from PIL import Image, ImageOps
-from diffusers import (
-    HunyuanVideo15ImageToVideoPipeline,
-)
+from diffusers import DiffusionPipeline
 from diffusers.utils import export_to_video
 
 
@@ -29,10 +27,7 @@ from diffusers.utils import export_to_video
 # MODEL
 # =========================================================
 
-MODEL_ID = (
-    "hunyuanvideo-community/"
-    "HunyuanVideo-1.5-Diffusers-480p_i2v_step_distilled"
-)
+MODEL_ID = "Wan-AI/Wan2.2-I2V-A14B-Diffusers"
 
 OUTPUT_DIR = "outputs"
 
@@ -41,11 +36,14 @@ OUTPUT_DIR = "outputs"
 # HIDDEN BACKEND SETTINGS
 # =========================================================
 
-NUM_FRAMES = 121
-NUM_INFERENCE_STEPS = 12
-FPS = 24
-
+# Start with a manageable test resolution.
 MAX_DIMENSION = 512
+
+NUM_FRAMES = 81
+
+NUM_INFERENCE_STEPS = 30
+
+FPS = 24
 
 
 # =========================================================
@@ -67,34 +65,28 @@ def _load_pipeline():
         return _pipe
 
     print(
-        f"Loading HunyuanVideo 1.5: {MODEL_ID}",
+        f"Loading Wan 2.2 I2V: {MODEL_ID}",
         flush=True,
     )
 
-    dtype = torch.bfloat16
-
-    _pipe = (
-        HunyuanVideo15ImageToVideoPipeline
-        .from_pretrained(
-            MODEL_ID,
-            torch_dtype=dtype,
-        )
+    _pipe = DiffusionPipeline.from_pretrained(
+        MODEL_ID,
+        torch_dtype=torch.bfloat16,
     )
 
-    # Keep most of the model in CPU memory and move
-    # components to the GPU as needed.
-    _pipe.enable_model_cpu_offload()
+    if torch.cuda.is_available():
+        _pipe.to("cuda")
 
-    try:
-        _pipe.vae.enable_tiling()
-    except Exception as exc:
-        print(
-            f"VAE tiling unavailable: {exc}",
-            flush=True,
-        )
+        try:
+            _pipe.enable_model_cpu_offload()
+        except Exception as exc:
+            print(
+                f"CPU offload unavailable: {exc}",
+                flush=True,
+            )
 
     print(
-        "HunyuanVideo 1.5 ready.",
+        "Wan 2.2 I2V ready.",
         flush=True,
     )
 
@@ -119,7 +111,6 @@ def _prepare_image(
             "Invalid source image."
         )
 
-    # Preserve the original aspect ratio.
     scale = min(
         MAX_DIMENSION / max(width, height),
         1.0,
@@ -135,8 +126,7 @@ def _prepare_image(
         int(height * scale),
     )
 
-    # Hunyuan/Diffusion dimensions should be divisible
-    # by 8.
+    # Wan works with dimensions divisible by 8.
     new_width = max(
         64,
         (new_width // 8) * 8,
@@ -148,7 +138,7 @@ def _prepare_image(
     )
 
     print(
-        f"Video source: "
+        f"Wan source: "
         f"{width}x{height} -> "
         f"{new_width}x{new_height}",
         flush=True,
@@ -164,7 +154,7 @@ def _prepare_image(
 # IMAGE → VIDEO
 # =========================================================
 
-@spaces.GPU(duration=180)
+@spaces.GPU(duration=300)
 def generate_video(
     image: Image.Image,
     prompt: str,
@@ -203,7 +193,6 @@ def generate_video(
 
     # -----------------------------------------------------
     # Motion instruction.
-    # Keep the source image and identity stable.
     # -----------------------------------------------------
 
     video_prompt = (
@@ -211,20 +200,19 @@ def generate_video(
         "Preserve the same person, face, identity, "
         "clothing, environment, camera framing and "
         "overall composition from the source image. "
-        "Create natural realistic motion. "
-        "Maintain realistic human anatomy and facial "
-        "features throughout the video. "
-        "No morphing, no identity drift, no melting, "
+        "Create natural realistic human movement. "
+        "Maintain realistic facial features and anatomy. "
+        "No identity drift, no morphing, no melting, "
         "no sudden scene changes."
     )
 
     print(
-        f"Hunyuan I2V prompt: {prompt}",
+        f"Wan 2.2 I2V prompt: {prompt}",
         flush=True,
     )
 
     print(
-        f"Hunyuan seed: {seed}",
+        f"Wan 2.2 seed: {seed}",
         flush=True,
     )
 
@@ -243,7 +231,7 @@ def generate_video(
     frames = result.frames[0]
 
     # -----------------------------------------------------
-    # Save video
+    # Save
     # -----------------------------------------------------
 
     os.makedirs(
@@ -253,7 +241,7 @@ def generate_video(
 
     output_path = os.path.join(
         OUTPUT_DIR,
-        f"hunyuan_i2v_{uuid.uuid4().hex[:10]}.mp4",
+        f"wan22_i2v_{uuid.uuid4().hex[:10]}.mp4",
     )
 
     export_to_video(
@@ -263,7 +251,7 @@ def generate_video(
     )
 
     print(
-        f"Hunyuan video complete: {output_path}",
+        f"Wan 2.2 video complete: {output_path}",
         flush=True,
     )
 
