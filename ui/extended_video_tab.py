@@ -26,7 +26,7 @@ def build():
             input_video = gr.Video(
                 label="🎬 Source Video",
                 sources=["upload"],
-                type="filepath",
+                
             )
 
             prompt = gr.Textbox(
