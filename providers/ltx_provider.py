@@ -133,24 +133,21 @@ def _get_pipeline():
 # ============================================================
 # EXTEND VIDEO
 # ============================================================
-
 @spaces.GPU(duration=300)
 def extend_video(
     video_path,
     prompt: str,
-    extension_frames: int = 81,
+    extension_frames: int = 9,
     seed: int = 0,
 ):
-
     """
     Extend the END of an existing video using LTX.
 
-    The final 81 frames of the source video are used as
-    conditioning context.
-
-    LTX frame counts must follow the 8n + 1 pattern.
-
-    Seed remains backend-only.
+    Controlled diagnostic test:
+    - 81 conditioning frames
+    - 9-frame extension request
+    - 89 total output frames
+    - 24 FPS
     """
 
     if not video_path:
@@ -197,12 +194,6 @@ def extend_video(
 
     # --------------------------------------------------------
     # CONDITIONING
-    #
-    # LTX requires frame counts in the form:
-    #
-    # 8n + 1
-    #
-    # 81 = 8 * 10 + 1
     # --------------------------------------------------------
 
     conditioning_frames = 81
@@ -236,7 +227,6 @@ def extend_video(
         )
 
     if first_frame.size != (width, height):
-
         conditioning_video = [
             frame.resize(
                 (width, height)
@@ -250,151 +240,90 @@ def extend_video(
     )
 
     # --------------------------------------------------------
-    # EXTENSION LENGTH
+    # CONTROLLED FRAME TEST
+    #
+    # 81 conditioning frames
+    # + 9 extension frames
+    # - 1 overlapping frame
+    # = 89 total frames
+    #
+    # 89 = 8 * 11 + 1
     # --------------------------------------------------------
 
-    # --------------------------------------------------------
-# EXTENSION LENGTH — CONTROLLED TEST
-#
-# Use 81 conditioning frames and generate only 8 new
-# frames beyond the conditioning window.
-#
-# 81 conditioning + 8 new = 89 total frames.
-#
-# At 24 FPS this is about 3.7 seconds total.
-# --------------------------------------------------------
+    conditioning_frames = 81
+    extension_frames = 9
 
-conditioning_frames = 81
-extension_frames = 9
-
-total_frames = (
-    conditioning_frames
-    + extension_frames
-    - 1
-)
-
-# LTX requires 8n + 1 frame counts.
-if (total_frames - 1) % 8 != 0:
     total_frames = (
-        ((total_frames - 1) // 8) * 8
-    ) + 1
-
-print(
-    f"[LTX] Conditioning frames: "
-    f"{conditioning_frames}"
-)
-
-print(
-    f"[LTX] Extension frames: "
-    f"{extension_frames}"
-)
-
-print(
-    f"[LTX] Target output frames: "
-    f"{total_frames}"
-)
-
-print(
-    f"[LTX] Approximate output duration: "
-    f"{total_frames / LTX_FPS:.2f} seconds"
-)
-
-
-    # Force extension length to 8n + 1.
-extension_frames = (
-        (
-            (extension_frames - 1) // 8
-        ) * 8
-    ) + 1
-
-    # The first conditioning frame overlaps with the
-    # generated continuation, so subtract one frame.
-    #
-    # Example:
-    #
-    # conditioning = 81
-    # extension = 81
-    #
-    # total = 81 + 81 - 1 = 161
-    #
-    # 161 = 8 * 20 + 1
-    #
-total_frames = (
         conditioning_frames
         + extension_frames
         - 1
     )
 
-    # Safety check: LTX frame count must be 8n + 1.
-if (total_frames - 1) % 8 != 0:
+    # Safety check for LTX 8n + 1 requirement.
+    if (total_frames - 1) % 8 != 0:
         total_frames = (
             ((total_frames - 1) // 8) * 8
         ) + 1
 
-print(
+    print(
         f"[LTX] Conditioning frames: "
         f"{conditioning_frames}"
     )
 
-print(
+    print(
         f"[LTX] Extension frames: "
         f"{extension_frames}"
     )
 
-print(
+    print(
         f"[LTX] Target output frames: "
         f"{total_frames}"
     )
 
-print(
+    print(
         f"[LTX] Approximate output duration: "
         f"{total_frames / LTX_FPS:.2f} seconds"
     )
 
     # --------------------------------------------------------
-    # PIPELINE
+    # LOAD PIPELINE
     # --------------------------------------------------------
 
-pipeline = _get_pipeline()
+    pipeline = _get_pipeline()
 
-generator = torch.Generator(
+    # --------------------------------------------------------
+    # SEED
+    # --------------------------------------------------------
+
+    generator = torch.Generator(
         device="cuda"
     ).manual_seed(
         int(seed)
     )
 
-condition = LTXVideoCondition(
+    # --------------------------------------------------------
+    # CONDITION
+    # --------------------------------------------------------
+
+    condition = LTXVideoCondition(
         video=conditioning_video,
         frame_index=0,
     )
 
     # --------------------------------------------------------
     # GENERATION
-    #
-    # IMPORTANT:
-    #
-    # Do NOT manually pass timesteps here.
-    #
-    # Current Diffusers versions use the scheduler's own
-    # timestep handling. Passing our old custom timestep
-    # schedule triggers:
-    #
-    # ValueError:
-    # `mu` must be passed when `use_dynamic_shifting`
-    # is set to be `True`
     # --------------------------------------------------------
 
-num_inference_steps = 30
-
-print(
-        "[LTX] Using scheduler default timestep handling."
+    print(
+        "[LTX] Using scheduler default "
+        "timestep handling."
     )
 
-print(
+    print(
         "[LTX] Generating continuation..."
     )
 
-result = pipeline(
+    result = pipeline(
         conditions=[condition],
         prompt=prompt.strip(),
         negative_prompt=LTX_NEGATIVE_PROMPT,
@@ -402,7 +331,7 @@ result = pipeline(
         height=height,
         num_frames=total_frames,
         frame_rate=LTX_FPS,
-        num_inference_steps=num_inference_steps,
+        num_inference_steps=30,
         guidance_scale=1.0,
         image_cond_noise_scale=0.025,
         decode_timestep=0.05,
@@ -414,44 +343,45 @@ result = pipeline(
     # EXTRACT FRAMES
     # --------------------------------------------------------
 
-frames = result.frames[0]
+    frames = result.frames[0]
 
-if not frames:
+    if not frames:
         raise RuntimeError(
             "LTX returned no frames."
         )
 
-print(
-        f"[LTX] Generated {len(frames)} frames."
+    print(
+        f"[LTX] Generated "
+        f"{len(frames)} frames."
     )
 
     # --------------------------------------------------------
     # SAVE OUTPUT
     # --------------------------------------------------------
 
-output_dir = Path(
+    output_dir = Path(
         "outputs"
     )
 
-output_dir.mkdir(
+    output_dir.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-output_path = (
+    output_path = (
         output_dir
         / "ltx_extended_video.mp4"
     )
 
-export_to_video(
+    export_to_video(
         frames,
         str(output_path),
         fps=LTX_FPS,
     )
 
-print(
+    print(
         f"[LTX] Video saved to: "
         f"{output_path}"
     )
 
-return str(output_path)
+    return str(output_path)
