@@ -12,3 +12,4 @@ insightface>=0.7.3
 onnxruntime>=1.17.0
 imageio>=2.34.0
 imageio-ffmpeg>=0.4.9
+ftfy
