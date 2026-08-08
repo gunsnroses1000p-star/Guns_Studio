@@ -3,11 +3,11 @@ providers/img2img_provider.py
 
 Hugging Face SDXL InstructPix2Pix backend.
 
-The user supplies only:
-    - source image
-    - editing instruction
+Simple user interface:
+    - Source image
+    - Editing instruction
 
-All technical generation settings remain backend-only.
+All technical settings remain backend-only.
 """
 
 from __future__ import annotations
@@ -33,15 +33,14 @@ OUTPUT_DIR = "outputs"
 # HIDDEN BACKEND SETTINGS
 # =========================================================
 
-STEPS = 30
+STEPS = 35
 
-# How strongly the written instruction influences the edit.
-GUIDANCE_SCALE = 4.0
+# Stronger instruction following.
+GUIDANCE_SCALE = 7.5
 
-# How strongly the original image is preserved.
-IMAGE_GUIDANCE_SCALE = 1.5
+# Slightly less image locking so requested edits can happen.
+IMAGE_GUIDANCE_SCALE = 1.2
 
-# Internal negative prompt.
 NEGATIVE_PROMPT = (
     "blurry, low quality, low resolution, "
     "distorted face, deformed face, bad anatomy, "
@@ -62,7 +61,7 @@ _pipe = None
 
 
 # =========================================================
-# LOAD MODEL
+# LOAD PIPELINE
 # =========================================================
 
 def _load_pipeline():
@@ -97,7 +96,6 @@ def _load_pipeline():
     )
 
     if torch.cuda.is_available():
-
         _pipe.enable_model_cpu_offload()
 
         try:
@@ -117,7 +115,7 @@ def _load_pipeline():
 
 
 # =========================================================
-# PREPARE SOURCE IMAGE
+# PREPARE IMAGE
 # =========================================================
 
 def _prepare_image(
@@ -132,8 +130,7 @@ def _prepare_image(
     if width <= 0 or height <= 0:
         raise ValueError("Invalid source image.")
 
-    # Keep aspect ratio.
-    # SDXL InstructPix2Pix works around 768px well.
+    # Preserve the exact aspect ratio.
     max_dimension = 768
 
     scale = min(
@@ -143,17 +140,31 @@ def _prepare_image(
 
     new_width = max(
         64,
-        int(width * scale),
+        round(width * scale),
     )
 
     new_height = max(
         64,
-        int(height * scale),
+        round(height * scale),
     )
 
-    # Diffusion dimensions should be divisible by 8.
-    new_width = (new_width // 8) * 8
-    new_height = (new_height // 8) * 8
+    # Only round dimensions to multiples of 8.
+    # Do NOT independently scale width and height.
+    new_width = max(
+        64,
+        (new_width // 8) * 8,
+    )
+
+    new_height = max(
+        64,
+        (new_height // 8) * 8,
+    )
+
+    print(
+        f"Source size: {width}x{height} -> "
+        f"Img2Img size: {new_width}x{new_height}",
+        flush=True,
+    )
 
     return image.resize(
         (new_width, new_height),
@@ -162,7 +173,7 @@ def _prepare_image(
 
 
 # =========================================================
-# GENERATE EDIT
+# GENERATE
 # =========================================================
 
 @spaces.GPU
@@ -209,17 +220,18 @@ def generate_img2img(
     ).manual_seed(seed)
 
     # -----------------------------------------------------
-    # Strengthen the editing instruction without changing
-    # what the user asked for.
+    # Give the model a very direct editing instruction.
     # -----------------------------------------------------
 
     edit_prompt = (
+        f"Edit the provided image according to this instruction: "
         f"{prompt}. "
-        "Make the requested change clearly and accurately. "
-        "Keep the identity, composition, and all unrelated "
-        "details of the original image unchanged whenever "
-        "the instruction does not ask for them to change. "
-        "Maintain a photorealistic natural appearance."
+        "Make the requested change clearly visible. "
+        "Do not ignore the requested change. "
+        "Preserve the same person, face, pose, camera angle, "
+        "background, lighting, and composition unless the "
+        "instruction specifically asks to change them. "
+        "Photorealistic result."
     )
 
     print(
@@ -238,6 +250,17 @@ def generate_img2img(
     )
 
     output_image = result.images[0]
+
+    # -----------------------------------------------------
+    # Guarantee the output keeps the same aspect ratio
+    # as the prepared source.
+    # -----------------------------------------------------
+
+    if output_image.size != source.size:
+        output_image = output_image.resize(
+            source.size,
+            Image.Resampling.LANCZOS,
+        )
 
     os.makedirs(
         OUTPUT_DIR,
