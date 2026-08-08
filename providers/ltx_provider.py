@@ -65,10 +65,60 @@ def _get_pipeline():
         torch_dtype=torch.bfloat16,
     )
 
+    # --------------------------------------------------------
+    # FIX CURRENT DIFFUSERS / LTX SCHEDULER COMPATIBILITY
+    #
+    # Newer Diffusers versions can load the LTX scheduler
+    # with dynamic shifting enabled. That scheduler requires
+    # a `mu` value every time set_timesteps() is called.
+    #
+    # LTXConditionPipeline does not currently provide that
+    # value in this code path, so generation fails with:
+    #
+    # ValueError:
+    # `mu` must be passed when `use_dynamic_shifting`
+    # is set to be `True`
+    #
+    # Disable dynamic shifting and let the scheduler use its
+    # normal timestep calculation instead.
+    # --------------------------------------------------------
+
+    try:
+        from diffusers import FlowMatchEulerDiscreteScheduler
+
+        _PIPELINE.scheduler = (
+            FlowMatchEulerDiscreteScheduler.from_config(
+                _PIPELINE.scheduler.config,
+                use_dynamic_shifting=False,
+            )
+        )
+
+        print(
+            "[LTX] Scheduler patched: "
+            "dynamic shifting disabled."
+        )
+
+    except Exception as exc:
+        raise RuntimeError(
+            "Failed to configure the LTX scheduler: "
+            f"{exc}"
+        ) from exc
+
+    # --------------------------------------------------------
+    # MOVE TO GPU
+    # --------------------------------------------------------
+
     _PIPELINE.to("cuda")
+
+    # --------------------------------------------------------
+    # VAE TILING
+    # --------------------------------------------------------
 
     try:
         _PIPELINE.vae.enable_tiling()
+        print(
+            "[LTX] VAE tiling enabled."
+        )
     except Exception:
         pass
 
@@ -77,6 +127,7 @@ def _get_pipeline():
     )
 
     return _PIPELINE
+
 
 
 # ============================================================
