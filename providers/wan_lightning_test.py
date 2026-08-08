@@ -1,8 +1,8 @@
 """
 Temporary Wan 2.2 Lightning I2V test.
 
-This file is intentionally separate from the production
-Hunyuan video backend.
+This is a sandbox only.
+It does NOT replace the production Hunyuan backend.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import spaces
 import torch
 
 from PIL import Image, ImageOps
-from diffusers import WanImageToVideoPipeline
+from diffusers import DiffusionPipeline
 from diffusers.utils import export_to_video
 
 
@@ -25,12 +25,10 @@ MODEL_ID = (
 
 OUTPUT_DIR = "outputs"
 
-# Hidden test settings
 MAX_DIMENSION = 512
 NUM_FRAMES = 49
 NUM_INFERENCE_STEPS = 4
 FPS = 24
-
 
 _pipe = None
 
@@ -47,21 +45,13 @@ def _load_pipeline():
         flush=True,
     )
 
-    _pipe = WanImageToVideoPipeline.from_pretrained(
+    _pipe = DiffusionPipeline.from_pretrained(
         MODEL_ID,
         torch_dtype=torch.bfloat16,
+        device_map="cuda",
     )
 
-    if torch.cuda.is_available():
-
-        try:
-            _pipe.enable_model_cpu_offload()
-        except Exception as exc:
-            print(
-                f"CPU offload unavailable: {exc}",
-                flush=True,
-            )
-            _pipe.to("cuda")
+    _pipe.to("cuda")
 
     print(
         "Wan 2.2 Lightning ready.",
@@ -71,7 +61,9 @@ def _load_pipeline():
     return _pipe
 
 
-def _prepare_image(image: Image.Image) -> Image.Image:
+def _prepare_image(
+    image: Image.Image,
+) -> Image.Image:
 
     image = ImageOps.exif_transpose(image)
     image = image.convert("RGB")
@@ -93,7 +85,6 @@ def _prepare_image(image: Image.Image) -> Image.Image:
         int(height * scale),
     )
 
-    # Wan prefers dimensions divisible by 16.
     new_width = max(
         64,
         (new_width // 16) * 16,
@@ -133,11 +124,11 @@ def test_wan_lightning(
             "Please provide a motion prompt."
         )
 
-    prompt = prompt.strip()
-
     pipe = _load_pipeline()
 
     source = _prepare_image(image)
+
+    prompt = prompt.strip()
 
     seed = torch.randint(
         0,
@@ -148,14 +139,6 @@ def test_wan_lightning(
     generator = torch.Generator(
         device="cuda"
     ).manual_seed(seed)
-
-    test_prompt = (
-        f"{prompt}. "
-        "Preserve the same person, identity, face, "
-        "clothing and environment from the source image. "
-        "Natural realistic motion, stable anatomy, "
-        "stable facial features, photorealistic video."
-    )
 
     print(
         f"Wan Lightning prompt: {prompt}",
@@ -169,7 +152,7 @@ def test_wan_lightning(
 
     result = pipe(
         image=source,
-        prompt=test_prompt,
+        prompt=prompt,
         num_frames=NUM_FRAMES,
         num_inference_steps=NUM_INFERENCE_STEPS,
         generator=generator,
