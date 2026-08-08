@@ -55,62 +55,6 @@ def build_app() -> gr.Blocks:
 
                 image_to_video_tab.build()
 
-
-            # =================================================
-            # TEMPORARY WAN LIGHTNING TEST
-            # =================================================
-
-            with gr.Tab("🧪 Wan Lightning Test"):
-
-                gr.Markdown(
-                    """
-                    ## 🧪 Wan 2.2 Lightning Test
-
-                    Temporary model test.
-                    """
-                )
-
-                with gr.Row():
-
-                    with gr.Column():
-
-                        test_image = gr.Image(
-                            label="📷 Source Image",
-                            type="pil",
-                        )
-
-                        test_prompt = gr.Textbox(
-                            label="💬 Motion Prompt",
-                            placeholder=(
-                                "Describe the motion..."
-                            ),
-                            lines=4,
-                        )
-
-                        test_button = gr.Button(
-                            "🚀 Test Wan Lightning",
-                            variant="primary",
-                        )
-
-                    with gr.Column():
-
-                        test_result = gr.Video(
-                            label="🎥 Wan Lightning Result",
-                            format="mp4",
-                        )
-
-                test_button.click(
-                    fn=test_wan_lightning,
-                    inputs=[
-                        test_image,
-                        test_prompt,
-                    ],
-                    outputs=[
-                        test_result,
-                    ],
-                )
-
-
     return demo
 
 
