@@ -301,7 +301,7 @@ print(
 
 
     # Force extension length to 8n + 1.
-    extension_frames = (
+extension_frames = (
         (
             (extension_frames - 1) // 8
         ) * 8
@@ -319,34 +319,34 @@ print(
     #
     # 161 = 8 * 20 + 1
     #
-    total_frames = (
+total_frames = (
         conditioning_frames
         + extension_frames
         - 1
     )
 
     # Safety check: LTX frame count must be 8n + 1.
-    if (total_frames - 1) % 8 != 0:
+if (total_frames - 1) % 8 != 0:
         total_frames = (
             ((total_frames - 1) // 8) * 8
         ) + 1
 
-    print(
+print(
         f"[LTX] Conditioning frames: "
         f"{conditioning_frames}"
     )
 
-    print(
+print(
         f"[LTX] Extension frames: "
         f"{extension_frames}"
     )
 
-    print(
+print(
         f"[LTX] Target output frames: "
         f"{total_frames}"
     )
 
-    print(
+print(
         f"[LTX] Approximate output duration: "
         f"{total_frames / LTX_FPS:.2f} seconds"
     )
@@ -355,15 +355,15 @@ print(
     # PIPELINE
     # --------------------------------------------------------
 
-    pipeline = _get_pipeline()
+pipeline = _get_pipeline()
 
-    generator = torch.Generator(
+generator = torch.Generator(
         device="cuda"
     ).manual_seed(
         int(seed)
     )
 
-    condition = LTXVideoCondition(
+condition = LTXVideoCondition(
         video=conditioning_video,
         frame_index=0,
     )
@@ -384,17 +384,17 @@ print(
     # is set to be `True`
     # --------------------------------------------------------
 
-    num_inference_steps = 30
+num_inference_steps = 30
 
-    print(
+print(
         "[LTX] Using scheduler default timestep handling."
     )
 
-    print(
+print(
         "[LTX] Generating continuation..."
     )
 
-    result = pipeline(
+result = pipeline(
         conditions=[condition],
         prompt=prompt.strip(),
         negative_prompt=LTX_NEGATIVE_PROMPT,
@@ -414,14 +414,14 @@ print(
     # EXTRACT FRAMES
     # --------------------------------------------------------
 
-    frames = result.frames[0]
+frames = result.frames[0]
 
-    if not frames:
+if not frames:
         raise RuntimeError(
             "LTX returned no frames."
         )
 
-    print(
+print(
         f"[LTX] Generated {len(frames)} frames."
     )
 
@@ -429,29 +429,29 @@ print(
     # SAVE OUTPUT
     # --------------------------------------------------------
 
-    output_dir = Path(
+output_dir = Path(
         "outputs"
     )
 
-    output_dir.mkdir(
+output_dir.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    output_path = (
+output_path = (
         output_dir
         / "ltx_extended_video.mp4"
     )
 
-    export_to_video(
+export_to_video(
         frames,
         str(output_path),
         fps=LTX_FPS,
     )
 
-    print(
+print(
         f"[LTX] Video saved to: "
         f"{output_path}"
     )
 
-    return str(output_path)
+return str(output_path)
