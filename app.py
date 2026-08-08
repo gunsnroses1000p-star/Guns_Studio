@@ -26,20 +26,8 @@ from ui import extended_video_tab
 def build_app() -> gr.Blocks:
 
     with gr.Blocks(
-    title="Guns AI Studio",
-    css="""
-    html,
-    body,
-    .gradio-container {
-        overflow-y: auto !important;
-        min-height: 100vh !important;
-    }
-
-    .tabitem {
-        overflow: visible !important;
-    }
-    """
-) as demo:
+        title="Guns AI Studio"
+    ) as demo:
 
         gr.Markdown(
             """

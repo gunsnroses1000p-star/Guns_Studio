@@ -5,7 +5,7 @@ LTX-Video provider for extending an existing video.
 """
 
 from __future__ import annotations
-
+import spaces 
 import os
 from pathlib import Path
 
@@ -74,7 +74,7 @@ def _get_pipeline():
 # ============================================================
 # EXTEND VIDEO
 # ============================================================
-
+@spaces.GPU(duration=300)
 def extend_video(
     video_path,
     prompt: str,
