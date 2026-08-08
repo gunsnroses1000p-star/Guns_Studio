@@ -1,165 +1,148 @@
 """
 providers/img2img_provider.py
 
-Hugging Face Diffusers Img2Img backend.
+Hugging Face RealVisXL Img2Img backend.
 
-All technical generation settings stay backend-only.
-The UI should expose only:
-    - source image
-    - prompt
-    - generate button
+User-facing controls are intentionally kept simple.
+All generation parameters remain backend-only.
 """
 
 from __future__ import annotations
 
 import os
 import uuid
-from typing import Optional
 
 import spaces
+import torch
 from PIL import Image
 
-from config import (
-    HF_TOKEN,
-    IMAGE_STEPS_DEFAULT,
-    IMAGE_GUIDANCE_DEFAULT,
-    IMAGE_WIDTH_DEFAULT,
-    IMAGE_HEIGHT_DEFAULT,
-    OUTPUT_DIR,
-)
-
 
 # =========================================================
-# BACKEND DEFAULTS
+# BACKEND CONFIGURATION
 # =========================================================
 
-# Dedicated Img2Img model.
-# Keep this separate from the normal text-to-image model.
-IMG2IMG_MODEL_DEFAULT = os.environ.get(
-    "IMG2IMG_MODEL",
-    "stabilityai/stable-diffusion-xl-base-1.0",
-)
+MODEL_ID = "SG161222/RealVisXL_V4.0"
 
-# Internal strength.
-# Lower = preserve more of the original image.
-# Higher = allow more transformation.
-IMG2IMG_STRENGTH_DEFAULT = 0.65
+# Hidden backend defaults.
+STRENGTH = 0.55
+STEPS = 30
+GUIDANCE = 5.5
 
-# Internal negative prompt.
-IMG2IMG_NEGATIVE_DEFAULT = (
-    "blurry, low quality, distorted face, deformed face, "
-    "bad anatomy, extra fingers, malformed hands, "
-    "duplicate person, duplicate face, "
+NEGATIVE_PROMPT = (
+    "blurry, low quality, low resolution, distorted face, "
+    "deformed face, bad anatomy, extra fingers, malformed hands, "
+    "duplicate person, duplicate face, mutated hands, "
     "cartoon, anime, CGI, 3d render, digital painting, "
-    "plastic skin, wax skin, doll skin, "
-    "overprocessed face, beauty filter, "
-    "oversized eyes, oversized lips, "
-    "asymmetrical eyes, distorted eyes"
+    "plastic skin, wax skin, doll skin, porcelain skin, "
+    "overprocessed face, beauty filter, airbrushed skin, "
+    "oversized eyes, oversized lips, asymmetrical eyes, "
+    "distorted eyes, unnatural skin texture"
 )
 
-
-# =========================================================
-# GLOBAL PIPELINE STATE
-# =========================================================
+OUTPUT_DIR = "outputs"
 
 _pipe = None
-_loaded_model = ""
 
 
 # =========================================================
 # MODEL LOADING
 # =========================================================
 
-def _load(model_name: str) -> None:
-    global _pipe, _loaded_model
+def _load_pipeline():
+    global _pipe
 
-    if _pipe is not None and _loaded_model == model_name:
-        return
+    if _pipe is not None:
+        return _pipe
 
-    import torch
     from diffusers import (
         StableDiffusionXLImg2ImgPipeline,
         DPMSolverMultistepScheduler,
     )
 
     print(
-        f"Loading Img2Img model {model_name}...",
+        f"Loading Img2Img model: {MODEL_ID}",
         flush=True,
     )
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    hf_token = os.environ.get("HF_TOKEN")
 
-    if device == "cuda":
-        dtype = torch.float16
-    else:
-        dtype = torch.float32
+    dtype = (
+        torch.float16
+        if torch.cuda.is_available()
+        else torch.float32
+    )
 
     _pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
-        model_name,
+        MODEL_ID,
         torch_dtype=dtype,
-        token=HF_TOKEN or None,
+        token=hf_token or None,
     )
 
-    # Better quality/speed scheduler.
+    # DPM++ 2M Karras is a strong general-purpose choice
+    # for realistic SDXL generation.
     _pipe.scheduler = DPMSolverMultistepScheduler.from_config(
-        _pipe.scheduler.config
+        _pipe.scheduler.config,
+        use_karras_sigmas=True,
     )
 
-    if device == "cuda":
+    if torch.cuda.is_available():
         _pipe.enable_model_cpu_offload()
-        _pipe.enable_vae_tiling()
-    else:
-        _pipe = _pipe.to(device)
 
-    _loaded_model = model_name
+        try:
+            _pipe.enable_vae_tiling()
+        except Exception:
+            pass
+    else:
+        _pipe.to("cpu")
 
     print(
-        f"Img2Img model ready: {model_name}",
+        "RealVisXL Img2Img pipeline ready.",
         flush=True,
     )
+
+    return _pipe
 
 
 # =========================================================
 # IMAGE PREPARATION
 # =========================================================
 
-def _prepare_image(
-    image: Image.Image,
-    max_width: int = IMAGE_WIDTH_DEFAULT,
-    max_height: int = IMAGE_HEIGHT_DEFAULT,
-) -> Image.Image:
+def _prepare_image(image: Image.Image) -> Image.Image:
+    """
+    Preserve the source aspect ratio while keeping the image
+    at a sensible SDXL resolution.
+    """
 
     image = image.convert("RGB")
 
-    original_width, original_height = image.size
+    width, height = image.size
 
-    if original_width <= 0 or original_height <= 0:
-        raise ValueError("Invalid input image.")
+    if width <= 0 or height <= 0:
+        raise ValueError("Invalid source image.")
 
-    # Preserve the original aspect ratio.
+    # Keep the original aspect ratio.
+    max_dimension = 1024
+
     scale = min(
-        max_width / original_width,
-        max_height / original_height,
+        max_dimension / max(width, height),
         1.0,
     )
 
-    new_width = max(64, int(original_width * scale))
-    new_height = max(64, int(original_height * scale))
+    new_width = int(width * scale)
+    new_height = int(height * scale)
 
-    # Diffusion models work best with dimensions divisible by 8.
+    # SDXL works best with dimensions divisible by 8.
     new_width = max(64, (new_width // 8) * 8)
     new_height = max(64, (new_height // 8) * 8)
 
-    image = image.resize(
+    return image.resize(
         (new_width, new_height),
         Image.Resampling.LANCZOS,
     )
 
-    return image
-
 
 # =========================================================
-# GENERATION
+# IMG2IMG GENERATION
 # =========================================================
 
 @spaces.GPU
@@ -169,27 +152,23 @@ def generate_img2img(
 ) -> str:
 
     if image is None:
-        raise ValueError("Please upload an image.")
+        raise ValueError(
+            "Please upload a source image."
+        )
 
     if not prompt or not prompt.strip():
-        raise ValueError("Please enter a prompt.")
+        raise ValueError(
+            "Please enter a prompt."
+        )
 
     prompt = prompt.strip()
 
-    _load(IMG2IMG_MODEL_DEFAULT)
+    pipe = _load_pipeline()
 
-    prepared_image = _prepare_image(
-        image,
-        IMAGE_WIDTH_DEFAULT,
-        IMAGE_HEIGHT_DEFAULT,
-    )
+    source = _prepare_image(image)
 
-    # Generate with a random seed internally.
+    # Random seed is deliberately generated internally.
     # The user never sees or controls it.
-    import torch
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
     seed = torch.randint(
         0,
         2**31 - 1,
@@ -197,16 +176,21 @@ def generate_img2img(
     ).item()
 
     generator = torch.Generator(
-        device=device
+        device="cuda" if torch.cuda.is_available() else "cpu"
     ).manual_seed(seed)
 
-    result = _pipe(
+    print(
+        f"Generating Img2Img | seed={seed}",
+        flush=True,
+    )
+
+    result = pipe(
         prompt=prompt,
-        negative_prompt=IMG2IMG_NEGATIVE_DEFAULT,
-        image=prepared_image,
-        strength=IMG2IMG_STRENGTH_DEFAULT,
-        guidance_scale=IMAGE_GUIDANCE_DEFAULT,
-        num_inference_steps=IMAGE_STEPS_DEFAULT,
+        negative_prompt=NEGATIVE_PROMPT,
+        image=source,
+        strength=STRENGTH,
+        guidance_scale=GUIDANCE,
+        num_inference_steps=STEPS,
         generator=generator,
     )
 
@@ -219,7 +203,7 @@ def generate_img2img(
 
     output_path = os.path.join(
         OUTPUT_DIR,
-        f"img2img_{uuid.uuid4().hex[:8]}.png",
+        f"img2img_{uuid.uuid4().hex[:10]}.png",
     )
 
     output_image.save(
