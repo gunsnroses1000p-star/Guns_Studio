@@ -1,8 +1,6 @@
 """
 Temporary Wan 2.2 Lightning I2V test.
-
-This is a sandbox only.
-It does NOT replace the production Hunyuan backend.
+Sandbox only — does not replace Hunyuan.
 """
 
 from __future__ import annotations
@@ -27,7 +25,7 @@ OUTPUT_DIR = "outputs"
 
 MAX_DIMENSION = 512
 NUM_FRAMES = 49
-NUM_INFERENCE_STEPS = 4
+NUM_INFERENCE_STEPS = 12
 FPS = 24
 
 _pipe = None
@@ -47,7 +45,7 @@ def _load_pipeline():
 
     _pipe = DiffusionPipeline.from_pretrained(
         MODEL_ID,
-        torch_dtype=torch.bfloat16,
+        dtype=torch.bfloat16,
         device_map="cuda",
     )
 
@@ -61,9 +59,7 @@ def _load_pipeline():
     return _pipe
 
 
-def _prepare_image(
-    image: Image.Image,
-) -> Image.Image:
+def _prepare_image(image: Image.Image) -> Image.Image:
 
     image = ImageOps.exif_transpose(image)
     image = image.convert("RGB")
@@ -177,8 +173,7 @@ def test_wan_lightning(
     )
 
     print(
-        f"Wan Lightning test complete: "
-        f"{output_path}",
+        f"Wan Lightning test complete: {output_path}",
         flush=True,
     )
 
