@@ -5,7 +5,17 @@ app.py – Guns AI Studio entrypoint.
 import os
 
 import gradio as gr
+# ZeroGPU startup compatibility.
+# The actual Img2Img work is handled by Hugging Face inference.
+try:
+    import spaces
 
+    @spaces.GPU(duration=1)
+    def _zerogpu_startup_check():
+        return None
+
+except ImportError:
+    pass
 from ui import img2img_tab
 
 
