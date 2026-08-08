@@ -6,9 +6,23 @@ import os
 
 import gradio as gr
 
+# ZeroGPU startup compatibility.
+try:
+    import spaces
+
+    @spaces.GPU(duration=1)
+    def _zerogpu_startup_check():
+        return None
+
+except ImportError:
+    pass
+
+
 from ui import img2img_tab
 from ui import image_to_video_tab
+
 from providers.wan_lightning_test import test_wan_lightning
+
 
 def build_app() -> gr.Blocks:
 
@@ -24,55 +38,79 @@ def build_app() -> gr.Blocks:
 
         with gr.Tabs():
 
+            # =================================================
+            # IMG2IMG
+            # =================================================
+
             with gr.Tab("🖌️ Img2Img"):
+
                 img2img_tab.build()
 
+
+            # =================================================
+            # IMAGE TO VIDEO — HUNYUAN
+            # =================================================
+
             with gr.Tab("🎥 Image to Video"):
+
                 image_to_video_tab.build()
-        with gr.Tab("🧪 Wan Lightning Test"):
 
-            gr.Markdown(
-        """
-        ## 🧪 Wan 2.2 Lightning Test
-        Temporary test tab — this will be removed after the audition.
-        """
-    )
 
-    with gr.Row():
+            # =================================================
+            # TEMPORARY WAN LIGHTNING TEST
+            # =================================================
 
-        with gr.Column():
+            with gr.Tab("🧪 Wan Lightning Test"):
 
-            test_image = gr.Image(
-                label="📷 Source Image",
-                type="pil",
-            )
+                gr.Markdown(
+                    """
+                    ## 🧪 Wan 2.2 Lightning Test
 
-            test_prompt = gr.Textbox(
-                label="💬 Motion Prompt",
-                placeholder="Describe the motion...",
-                lines=4,
-            )
+                    Temporary model test.
+                    """
+                )
 
-            test_button = gr.Button(
-                "🚀 Test Wan Lightning",
-                variant="primary",
-            )
+                with gr.Row():
 
-        with gr.Column():
+                    with gr.Column():
 
-            test_result = gr.Video(
-                label="🎥 Wan Lightning Result",
-                format="mp4",
-            )
+                        test_image = gr.Image(
+                            label="📷 Source Image",
+                            type="pil",
+                        )
 
-    test_button.click(
-        fn=test_wan_lightning,
-        inputs=[
-            test_image,
-            test_prompt,
-        ],
-        outputs=test_result,
-    )
+                        test_prompt = gr.Textbox(
+                            label="💬 Motion Prompt",
+                            placeholder=(
+                                "Describe the motion..."
+                            ),
+                            lines=4,
+                        )
+
+                        test_button = gr.Button(
+                            "🚀 Test Wan Lightning",
+                            variant="primary",
+                        )
+
+                    with gr.Column():
+
+                        test_result = gr.Video(
+                            label="🎥 Wan Lightning Result",
+                            format="mp4",
+                        )
+
+                test_button.click(
+                    fn=test_wan_lightning,
+                    inputs=[
+                        test_image,
+                        test_prompt,
+                    ],
+                    outputs=[
+                        test_result,
+                    ],
+                )
+
+
     return demo
 
 
