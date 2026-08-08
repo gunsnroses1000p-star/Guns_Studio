@@ -45,7 +45,7 @@ NUM_FRAMES = 121
 NUM_INFERENCE_STEPS = 12
 FPS = 24
 
-MAX_DIMENSION = 832
+MAX_DIMENSION = 512
 
 
 # =========================================================
