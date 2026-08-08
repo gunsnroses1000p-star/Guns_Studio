@@ -43,7 +43,7 @@ IMG2IMG_MODEL_DEFAULT = os.environ.get(
 # Internal strength.
 # Lower = preserve more of the original image.
 # Higher = allow more transformation.
-IMG2IMG_STRENGTH_DEFAULT = 0.35
+IMG2IMG_STRENGTH_DEFAULT = 0.65
 
 # Internal negative prompt.
 IMG2IMG_NEGATIVE_DEFAULT = (
