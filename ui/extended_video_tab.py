@@ -10,6 +10,7 @@ from providers.ltx_provider import extend_video
 
 
 def build():
+
     gr.Markdown(
         """
         ## ⏩ Extended Video
@@ -26,7 +27,6 @@ def build():
             input_video = gr.Video(
                 label="🎬 Source Video",
                 sources=["upload"],
-                
             )
 
             prompt = gr.Textbox(
@@ -48,12 +48,6 @@ def build():
                 label="⏱️ Extension Length",
             )
 
-            seed = gr.Number(
-                label="🎲 Seed",
-                value=0,
-                precision=0,
-            )
-
             extend_button = gr.Button(
                 "⏩ Extend Video",
                 variant="primary",
@@ -72,7 +66,6 @@ def build():
             input_video,
             prompt,
             extension_length,
-            seed,
         ],
         outputs=output_video,
     )
