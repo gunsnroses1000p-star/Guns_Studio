@@ -5,6 +5,7 @@ Sandbox only — does not replace Hunyuan.
 
 from __future__ import annotations
 
+import gc
 import os
 import uuid
 
@@ -25,7 +26,7 @@ OUTPUT_DIR = "outputs"
 
 MAX_DIMENSION = 512
 NUM_FRAMES = 49
-NUM_INFERENCE_STEPS = 12
+NUM_INFERENCE_STEPS = 4
 FPS = 24
 
 _pipe = None
@@ -43,13 +44,20 @@ def _load_pipeline():
         flush=True,
     )
 
+    gc.collect()
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
     _pipe = DiffusionPipeline.from_pretrained(
         MODEL_ID,
-        dtype=torch.bfloat16,
-        device_map="cuda",
+        torch_dtype=torch.bfloat16,
     )
 
-    _pipe.to("cuda")
+    # Keep the large model components on CPU when not needed.
+    # This is slower than putting everything on GPU,
+    # but prevents the 80 GB GPU from running out of memory.
+    _pipe.enable_model_cpu_offload()
 
     print(
         "Wan 2.2 Lightning ready.",
@@ -59,7 +67,9 @@ def _load_pipeline():
     return _pipe
 
 
-def _prepare_image(image: Image.Image) -> Image.Image:
+def _prepare_image(
+    image: Image.Image,
+) -> Image.Image:
 
     image = ImageOps.exif_transpose(image)
     image = image.convert("RGB")
