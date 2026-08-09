@@ -1,17 +1,37 @@
-gradio==6.22.0
-torch>=2.0.0
-transformers>=4.38.0
-diffusers>=0.36.0
-accelerate>=0.28.0
+# ------------------------------------------------------------
+# AnyFlow / PyTorch
+# ------------------------------------------------------------
+torch
+torchvision
+torchaudio
+
+accelerate==1.10.0
+diffusers==0.38.0
+transformers==4.50.0
+peft==0.17.0
+
+# ------------------------------------------------------------
+# Hugging Face
+# ------------------------------------------------------------
 huggingface_hub>=0.21.0
+
+# ------------------------------------------------------------
+# Core image / video
+# ------------------------------------------------------------
 Pillow>=10.0.0
+numpy<2.0.0
 scipy>=1.12.0
+opencv-python-headless
+imageio==2.37.0
+imageio-ffmpeg==0.6.0
 soundfile>=0.12.1
-opencv-python-headless>=4.9.0
+
+# ------------------------------------------------------------
+# Existing Guns Studio dependencies
+# ------------------------------------------------------------
 insightface>=0.7.3
 onnxruntime>=1.17.0
-imageio>=2.34.0
-imageio-ffmpeg>=0.4.9
+
 ftfy
 sentencepiece
 tiktoken
