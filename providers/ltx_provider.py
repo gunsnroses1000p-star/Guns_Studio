@@ -191,28 +191,27 @@ def _prepare_context(source_video):
 def extend_video(
     video_path,
     prompt: str,
-    extension_frames: int = 48,
+    extension_frames: int = 81,
     seed: int = 0,
 ):
     """
-    Extend an existing video using AnyFlow-FAR V2V.
+    Extend an existing video using AnyFlow-FAR.
 
-    Existing video
-          |
-          v
-    final 33 frames
-          |
-          v
-    AnyFlow-FAR
-          |
-          v
-    81-frame generation window
-          |
-          v
-    discard 33-frame conditioning overlap
-          |
-          v
-    append 48 new frames
+    AnyFlow-FAR generates an 81-frame window using the final
+    33 frames of the current video as conditioning context.
+
+    Each generation therefore contributes:
+
+        81 generated frames
+        - 33 conditioning frames
+        = 48 new frames
+
+    For longer requested extensions, multiple continuation passes
+    are performed. Each pass uses the newly extended video's final
+    33 frames as the next conditioning context.
+
+    The requested extension_frames value is therefore treated as
+    the approximate number of NEW frames to append.
     """
 
     if not video_path:
@@ -232,64 +231,69 @@ def extend_video(
             f"Video file not found: {video_path}"
         )
 
+    requested_extension = int(extension_frames)
+
+    if requested_extension <= 0:
+        raise ValueError(
+            "Extension length must be greater than zero."
+        )
+
     print("=" * 58)
-
-    print(
-        "[ANYFLOW] Starting video extension."
-    )
-
+    print("[ANYFLOW] Starting video extension.")
     print(
         f"[ANYFLOW] Input video: {video_path}"
     )
-
+    print(
+        f"[ANYFLOW] Requested NEW frames: "
+        f"{requested_extension}"
+    )
     print(
         f"[ANYFLOW] Prompt: {prompt.strip()}"
     )
-
     print(
         f"[ANYFLOW] Context frames: "
         f"{ANYFLOW_CONTEXT_FRAMES}"
     )
-
     print(
-        f"[ANYFLOW] Output frames: "
+        f"[ANYFLOW] Generation window: "
         f"{ANYFLOW_OUTPUT_FRAMES}"
     )
-
+    print(
+        f"[ANYFLOW] New frames per pass: "
+        f"{ANYFLOW_OUTPUT_FRAMES - ANYFLOW_CONTEXT_FRAMES}"
+    )
     print(
         f"[ANYFLOW] Inference steps: "
         f"{ANYFLOW_STEPS}"
     )
-
     print(
-        f"[ANYFLOW] FPS: {ANYFLOW_FPS}"
+        f"[ANYFLOW] FPS: "
+        f"{ANYFLOW_FPS}"
     )
 
     # --------------------------------------------------------
-    # LOAD VIDEO
+    # LOAD INITIAL VIDEO
     # --------------------------------------------------------
 
     print(
         "[ANYFLOW] Loading source video..."
     )
 
-    source_video = load_video(
+    current_video = load_video(
         video_path
     )
 
-    if not source_video:
+    if not current_video:
         raise RuntimeError(
             "AnyFlow could not read the input video."
         )
 
-    source_count = len(source_video)
-
     print(
-        f"[ANYFLOW] Source contains "
-        f"{source_count} frames."
+        f"[ANYFLOW] Initial source contains "
+        f"{len(current_video)} frames."
     )
 
-    if source_count < ANYFLOW_CONTEXT_FRAMES:
+    if len(current_video) < ANYFLOW_CONTEXT_FRAMES:
         raise ValueError(
             "The source video is too short. "
             f"At least {ANYFLOW_CONTEXT_FRAMES} "
@@ -303,21 +307,31 @@ def extend_video(
     pipeline = _get_pipeline()
 
     # --------------------------------------------------------
-    # PREPARE CONTEXT
+    # CALCULATE PASSES
     # --------------------------------------------------------
 
-    print(
-        "[ANYFLOW] Preparing final "
-        f"{ANYFLOW_CONTEXT_FRAMES} frames..."
+    new_frames_per_pass = (
+        ANYFLOW_OUTPUT_FRAMES
+        - ANYFLOW_CONTEXT_FRAMES
     )
 
-    context = _prepare_context(
-        source_video
+    if new_frames_per_pass <= 0:
+        raise RuntimeError(
+            "AnyFlow configuration is invalid: "
+            "output frames must be greater than "
+            "context frames."
+        )
+
+    required_passes = int(
+        np.ceil(
+            requested_extension
+            / new_frames_per_pass
+        )
     )
 
     print(
-        f"[ANYFLOW] Context tensor shape: "
-        f"{tuple(context.shape)}"
+        f"[ANYFLOW] Required continuation passes: "
+        f"{required_passes}"
     )
 
     # --------------------------------------------------------
@@ -335,88 +349,242 @@ def extend_video(
     )
 
     # --------------------------------------------------------
-    # GENERATION
+    # CONTINUATION LOOP
     # --------------------------------------------------------
 
+    total_new_frames = 0
+
+    for pass_index in range(
+        required_passes
+    ):
+
+        print("-" * 58)
+
+        print(
+            f"[ANYFLOW] Continuation pass "
+            f"{pass_index + 1}/{required_passes}"
+        )
+
+        print(
+            f"[ANYFLOW] Current video frames: "
+            f"{len(current_video)}"
+        )
+
+        # ----------------------------------------------------
+        # PREPARE CURRENT CONTEXT
+        # ----------------------------------------------------
+
+        context_frames = current_video[
+            -ANYFLOW_CONTEXT_FRAMES:
+        ]
+
+        frames = []
+
+        for frame in context_frames:
+
+            frame = frame.resize(
+                (
+                    ANYFLOW_WIDTH,
+                    ANYFLOW_HEIGHT,
+                )
+            )
+
+            arr = (
+                np.asarray(frame)
+                .astype(np.float32)
+                / 255.0
+            )
+
+            frames.append(arr)
+
+        video_array = np.stack(
+            frames,
+            axis=0,
+        )
+
+        # T,H,W,C -> T,C,H,W
+
+        context = torch.from_numpy(
+            video_array
+        ).permute(
+            0,
+            3,
+            1,
+            2,
+        )
+
+        # T,C,H,W -> B,T,C,H,W
+
+        context = context.unsqueeze(0)
+
+        context = context.to(
+            device="cuda",
+            dtype=torch.float32,
+        )
+
+        print(
+            f"[ANYFLOW] Context tensor shape: "
+            f"{tuple(context.shape)}"
+        )
+
+        # ----------------------------------------------------
+        # GENERATION
+        # ----------------------------------------------------
+
+        print(
+            "[ANYFLOW] Starting AnyFlow-FAR..."
+        )
+
+        print(
+            "[ANYFLOW] Using KV cache."
+        )
+
+        print(
+            "[ANYFLOW] Using mean velocity."
+        )
+
+        with torch.inference_mode():
+
+            result = pipeline(
+                prompt=prompt.strip(),
+                video=context,
+                negative_prompt=ANYFLOW_NEGATIVE_PROMPT,
+                width=ANYFLOW_WIDTH,
+                height=ANYFLOW_HEIGHT,
+                num_frames=ANYFLOW_OUTPUT_FRAMES,
+                num_inference_steps=ANYFLOW_STEPS,
+                use_mean_velocity=True,
+                use_kv_cache=True,
+                generator=generator,
+            )
+
+        # ----------------------------------------------------
+        # GET GENERATED FRAMES
+        # ----------------------------------------------------
+
+        generated_frames = result.frames[0]
+
+        if generated_frames is None:
+            raise RuntimeError(
+                "AnyFlow returned no frames."
+            )
+
+        if len(generated_frames) == 0:
+            raise RuntimeError(
+                "AnyFlow returned an empty video."
+            )
+
+        print(
+            f"[ANYFLOW] Generated window: "
+            f"{len(generated_frames)} frames."
+        )
+
+        # ----------------------------------------------------
+        # REMOVE CONDITIONING OVERLAP
+        # ----------------------------------------------------
+
+        new_frames = generated_frames[
+            ANYFLOW_CONTEXT_FRAMES:
+        ]
+
+        if not new_frames:
+            raise RuntimeError(
+                "No new frames remained after "
+                "removing the conditioning overlap."
+            )
+
+        # ----------------------------------------------------
+        # ONLY TAKE WHAT WE STILL NEED
+        # ----------------------------------------------------
+
+        remaining_frames = (
+            requested_extension
+            - total_new_frames
+        )
+
+        frames_to_add = min(
+            len(new_frames),
+            remaining_frames,
+        )
+
+        new_frames = list(
+            new_frames[:frames_to_add]
+        )
+
+        print(
+            f"[ANYFLOW] New frames from pass: "
+            f"{len(new_frames)}"
+        )
+
+        # ----------------------------------------------------
+        # APPEND TO CURRENT VIDEO
+        # ----------------------------------------------------
+
+        current_video = (
+            list(current_video)
+            + new_frames
+        )
+
+        total_new_frames += len(
+            new_frames
+        )
+
+        print(
+            f"[ANYFLOW] Total new frames so far: "
+            f"{total_new_frames}"
+        )
+
+        print(
+            f"[ANYFLOW] Current total frames: "
+            f"{len(current_video)}"
+        )
+
+        # ----------------------------------------------------
+        # DONE?
+        # ----------------------------------------------------
+
+        if total_new_frames >= requested_extension:
+
+            print(
+                "[ANYFLOW] Requested extension "
+                "length reached."
+            )
+
+            break
+
+    # --------------------------------------------------------
+    # FINAL VIDEO
+    # --------------------------------------------------------
+
+    print("-" * 58)
+
     print(
-        "[ANYFLOW] Starting AnyFlow-FAR V2V..."
+        f"[ANYFLOW] Final source + extension frames: "
+        f"{len(current_video)}"
     )
 
     print(
-        "[ANYFLOW] Using KV cache."
-    )
-
-    print(
-        "[ANYFLOW] Using mean velocity."
-    )
-
-    with torch.inference_mode():
-
-        result = pipeline(
-            prompt=prompt.strip(),
-            video=context,
-            negative_prompt=ANYFLOW_NEGATIVE_PROMPT,
-            width=ANYFLOW_WIDTH,
-            height=ANYFLOW_HEIGHT,
-            num_frames=ANYFLOW_OUTPUT_FRAMES,
-            num_inference_steps=ANYFLOW_STEPS,
-            use_mean_velocity=True,
-            use_kv_cache=True,
-            generator=generator,
-        )
-
-    # --------------------------------------------------------
-    # OUTPUT
-    # --------------------------------------------------------
-
-    generated_frames = result.frames[0]
-
-    if generated_frames is None:
-        raise RuntimeError(
-            "AnyFlow returned no frames."
-        )
-
-    if len(generated_frames) == 0:
-        raise RuntimeError(
-            "AnyFlow returned an empty video."
-        )
-
-    print(
-        f"[ANYFLOW] Generated "
-        f"{len(generated_frames)} frames."
-    )
-
-    # --------------------------------------------------------
-    # REMOVE CONDITIONING OVERLAP
-    # --------------------------------------------------------
-
-    new_frames = generated_frames[
-        ANYFLOW_CONTEXT_FRAMES:
-    ]
-
-    if not new_frames:
-        raise RuntimeError(
-            "No new frames remained after removing "
-            "the conditioning overlap."
-        )
-
-    print(
-        f"[ANYFLOW] New frames: "
-        f"{len(new_frames)}"
+        f"[ANYFLOW] Actual new frames added: "
+        f"{total_new_frames}"
     )
 
     print(
         f"[ANYFLOW] Added duration: "
-        f"{len(new_frames) / ANYFLOW_FPS:.2f} seconds"
+        f"{total_new_frames / ANYFLOW_FPS:.2f} seconds"
+    )
+
+    print(
+        f"[ANYFLOW] Final duration: "
+        f"{len(current_video) / ANYFLOW_FPS:.2f} seconds"
     )
 
     # --------------------------------------------------------
-    # PREPARE ORIGINAL VIDEO
+    # RESIZE FINAL VIDEO
     # --------------------------------------------------------
 
-    original_frames = []
+    final_frames = []
 
-    for frame in source_video:
+    for frame in current_video:
 
         frame = frame.resize(
             (
@@ -425,28 +593,9 @@ def extend_video(
             )
         )
 
-        original_frames.append(
+        final_frames.append(
             frame
         )
-
-    # --------------------------------------------------------
-    # APPEND ONLY NEW FRAMES
-    # --------------------------------------------------------
-
-    final_frames = (
-        original_frames
-        + list(new_frames)
-    )
-
-    print(
-        f"[ANYFLOW] Final frames: "
-        f"{len(final_frames)}"
-    )
-
-    print(
-        f"[ANYFLOW] Final duration: "
-        f"{len(final_frames) / ANYFLOW_FPS:.2f} seconds"
-    )
 
     # --------------------------------------------------------
     # EXPORT
