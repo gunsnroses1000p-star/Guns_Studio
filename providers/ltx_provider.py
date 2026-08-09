@@ -332,7 +332,7 @@ def extend_video(
         num_frames=total_frames,
         frame_rate=LTX_FPS,
         num_inference_steps=30,
-        guidance_scale=1.0,
+        guidance_scale=3.5,
         image_cond_noise_scale=0.025,
         decode_timestep=0.05,
         decode_noise_scale=0.025,
