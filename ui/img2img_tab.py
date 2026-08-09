@@ -16,17 +16,19 @@ def build():
         <style>
 
         /* ========================================================
-           GUNS AI STUDIO — IMG2IMG
+           GUNS AI STUDIO — IMG2IMG VISUAL THEME
+           IMPORTANT:
+           No global overflow, height, or viewport rules.
+           Gradio controls the page layout and scrolling.
            ======================================================== */
 
         .guns-img2img {
-            width: 100% !important;
             max-width: 1250px !important;
             margin: 0 auto !important;
         }
 
         /* ========================================================
-           ICONS
+           CUSTOM SVG ICONS
            ======================================================== */
 
         .guns-icon {
@@ -35,9 +37,8 @@ def build():
             display: inline-block;
             vertical-align: middle;
             margin-right: 8px;
-            filter: drop-shadow(
-                0 0 5px rgba(168, 85, 247, 0.55)
-            );
+            filter:
+                drop-shadow(0 0 5px rgba(168, 85, 247, 0.55));
         }
 
         .guns-icon-lg {
@@ -46,9 +47,8 @@ def build():
             display: inline-block;
             vertical-align: middle;
             margin-right: 9px;
-            filter: drop-shadow(
-                0 0 8px rgba(168, 85, 247, 0.65)
-            );
+            filter:
+                drop-shadow(0 0 8px rgba(168, 85, 247, 0.65));
         }
 
         /* ========================================================
@@ -65,6 +65,7 @@ def build():
             font-size: 29px !important;
             font-weight: 700 !important;
             line-height: 1.15 !important;
+            letter-spacing: -0.4px !important;
         }
 
         .guns-img2img-subtitle {
@@ -79,15 +80,8 @@ def build():
            ======================================================== */
 
         .guns-panel {
-            border: 1px solid rgba(
-                168,
-                85,
-                247,
-                0.24
-            ) !important;
-
+            border: 1px solid rgba(168, 85, 247, 0.24) !important;
             border-radius: 18px !important;
-
             padding: 17px !important;
 
             background:
@@ -98,13 +92,8 @@ def build():
                 ) !important;
 
             box-shadow:
-                0 8px 30px rgba(0, 0, 0, 0.38),
-                inset 0 1px 0 rgba(
-                    255,
-                    255,
-                    255,
-                    0.025
-                ) !important;
+                0 8px 30px rgba(0, 0, 0, 0.32),
+                inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
         }
 
         .guns-panel-title {
@@ -118,12 +107,13 @@ def build():
             font-size: 13px !important;
             font-weight: 700 !important;
 
-            letter-spacing: 1.5px !important;
+            letter-spacing: 1.4px !important;
             text-transform: uppercase !important;
         }
 
         /* ========================================================
            IMAGE COMPONENTS
+           No forced heights.
            ======================================================== */
 
         .guns-image-box {
@@ -146,7 +136,7 @@ def build():
                 168,
                 85,
                 247,
-                0.45
+                0.42
             ) !important;
 
             box-shadow:
@@ -192,7 +182,7 @@ def build():
                 168,
                 85,
                 247,
-                0.35
+                0.34
             ) !important;
         }
 
@@ -201,7 +191,7 @@ def build():
                 168,
                 85,
                 247,
-                0.65
+                0.62
             ) !important;
 
             box-shadow:
@@ -209,7 +199,7 @@ def build():
                     168,
                     85,
                     247,
-                    0.18
+                    0.16
                 ) !important;
         }
 
@@ -225,26 +215,8 @@ def build():
             margin-top: 13px !important;
         }
 
-        /*
-           Target the actual Gradio button directly.
-           Also override Gradio's primary colour variables.
-        */
-
         #guns-generate-button,
-        #guns-generate-button button,
-        #guns-generate-button .gr-button {
-            --button-primary-background-fill:
-                #8b5cf6 !important;
-
-            --button-primary-background-fill-hover:
-                #a855f7 !important;
-
-            --button-primary-text-color:
-                #ffffff !important;
-
-            --button-primary-border-color:
-                rgba(216, 180, 254, 0.55) !important;
-
+        #guns-generate-button button {
             background:
                 linear-gradient(
                     135deg,
@@ -253,8 +225,7 @@ def build():
                     #a855f7
                 ) !important;
 
-            background-color:
-                #8b5cf6 !important;
+            background-color: #8b5cf6 !important;
 
             color: #ffffff !important;
 
@@ -267,6 +238,8 @@ def build():
         #guns-generate-button button {
             width: 100% !important;
             min-height: 51px !important;
+
+            color: #ffffff !important;
 
             font-size: 15px !important;
             font-weight: 700 !important;
@@ -306,8 +279,12 @@ def build():
                     168,
                     85,
                     247,
-                    0.40
+                    0.38
                 ) !important;
+        }
+
+        #guns-generate-button button:active {
+            transform: translateY(0) !important;
         }
 
         /* ========================================================
@@ -363,7 +340,8 @@ def build():
         }
 
         /* ========================================================
-           MOBILE
+           MOBILE VISUAL ADJUSTMENTS ONLY
+           No layout/overflow manipulation.
            ======================================================== */
 
         @media (max-width: 768px) {
@@ -379,7 +357,7 @@ def build():
 
             .guns-img2img-subtitle {
                 font-size: 13px !important;
-                max-width: 340px !important;
+                line-height: 1.55 !important;
             }
 
             .guns-panel {
@@ -389,11 +367,11 @@ def build():
 
             .guns-panel-title {
                 font-size: 12px !important;
-                letter-spacing: 1.3px !important;
+                letter-spacing: 1.25px !important;
             }
 
             .guns-prompt textarea {
-                min-height: 145px !important;
+                min-height: 140px !important;
             }
 
             #guns-generate-button button {
@@ -406,7 +384,7 @@ def build():
     )
 
     # ============================================================
-    # MAIN UI
+    # MAIN CONTAINER
     # ============================================================
 
     with gr.Column(
@@ -466,13 +444,17 @@ def build():
         )
 
         # ========================================================
-        # PANELS
+        # INPUT / OUTPUT
+        #
+        # Gradio controls responsive behavior here.
+        # We intentionally do not force equal heights or
+        # mobile overflow behavior.
         # ========================================================
 
         with gr.Row():
 
             # ====================================================
-            # INPUT
+            # INPUT PANEL
             # ====================================================
 
             with gr.Column(
@@ -551,7 +533,7 @@ def build():
                 )
 
             # ====================================================
-            # OUTPUT
+            # OUTPUT PANEL
             # ====================================================
 
             with gr.Column(
@@ -604,7 +586,8 @@ def build():
                 )
 
         # ========================================================
-        # GENERATION — UNCHANGED
+        # GENERATION CONNECTION
+        # UNCHANGED
         # ========================================================
 
         generate_button.click(
