@@ -3,8 +3,8 @@ providers/ltx_provider.py
 
 AnyFlow-FAR video continuation provider.
 
-The filename is intentionally kept as ltx_provider.py for now
-so the existing Guns AI Studio app import does not need to change.
+The filename is intentionally retained so app.py does not need
+to change yet.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from diffusers.utils import export_to_video, load_video
 
 
 # ============================================================
-# ANYFLOW CONFIGURATION
+# CONFIG
 # ============================================================
 
 ANYFLOW_MODEL = os.environ.get(
@@ -29,26 +29,12 @@ ANYFLOW_MODEL = os.environ.get(
     "nvidia/AnyFlow-FAR-Wan2.1-1.3B-Diffusers",
 )
 
-# Official examples use 16 FPS.
 ANYFLOW_FPS = 16
 
-# AnyFlow-FAR released checkpoint is built around 81 output frames.
+# Canonical released AnyFlow-FAR configuration.
 ANYFLOW_OUTPUT_FRAMES = 81
 
-# 33 = 4 * 8 + 1
-#
-# We give AnyFlow the last 33 frames of the existing video
-# as V2V context.
-#
-# 33 context frames = about 2.06 seconds at 16 FPS.
-#
-# 81 output frames = about 5.06 seconds total.
-#
-# Therefore the new continuation is approximately:
-#
-# 81 - 33 = 48 frames
-# 48 / 16 = 3 seconds
-#
+# 33 = 4n + 1
 ANYFLOW_CONTEXT_FRAMES = 33
 
 ANYFLOW_WIDTH = 832
@@ -78,10 +64,6 @@ _PIPELINE = None
 # ============================================================
 
 def _get_pipeline():
-    """
-    Load AnyFlow-FAR once and keep it cached.
-    """
-
     global _PIPELINE
 
     if _PIPELINE is not None:
@@ -89,8 +71,8 @@ def _get_pipeline():
 
     if not torch.cuda.is_available():
         raise RuntimeError(
-            "AnyFlow-FAR requires a CUDA GPU. "
-            "No CUDA GPU is currently available."
+            "AnyFlow-FAR requires CUDA, but no CUDA GPU "
+            "is currently available."
         )
 
     print(
@@ -107,19 +89,11 @@ def _get_pipeline():
         torch_dtype=torch.bfloat16,
     )
 
-    # --------------------------------------------------------
-    # MOVE TO GPU
-    # --------------------------------------------------------
-
     print(
         "[ANYFLOW] Moving pipeline to CUDA..."
     )
 
     _PIPELINE.to("cuda")
-
-    # --------------------------------------------------------
-    # VAE TILING
-    # --------------------------------------------------------
 
     try:
         _PIPELINE.vae.enable_tiling()
@@ -147,22 +121,11 @@ def _get_pipeline():
 
 def _prepare_context(source_video):
     """
-    Take the final 33 frames of the source video and convert
-    them into the tensor format expected by AnyFlow-FAR.
+    Convert the final 33 source frames into:
 
-    Required format:
+        (1, 33, 3, 480, 832)
 
-        (B, T, C, H, W)
-
-    Values:
-
-        [0, 1]
-
-    T must satisfy:
-
-        T = 4n + 1
-
-    33 satisfies this requirement.
+    AnyFlow V2V requires T = 4n + 1.
     """
 
     if len(source_video) < ANYFLOW_CONTEXT_FRAMES:
@@ -175,37 +138,31 @@ def _prepare_context(source_video):
         -ANYFLOW_CONTEXT_FRAMES:
     ]
 
-    resized_frames = []
+    frames = []
 
     for frame in context_frames:
-        resized = frame.resize(
+
+        frame = frame.resize(
             (
                 ANYFLOW_WIDTH,
-                ANYFLOW_HEIGHT
+                ANYFLOW_HEIGHT,
             )
         )
 
-        resized_frames.append(
-            np.asarray(resized)
+        arr = (
+            np.asarray(frame)
             .astype(np.float32)
             / 255.0
         )
 
-    # --------------------------------------------------------
-    # PIL / NumPy:
-    #
-    # (T, H, W, C)
-    #
-    # AnyFlow:
-    #
-    # (B, T, C, H, W)
-    # --------------------------------------------------------
+        frames.append(arr)
 
     video_array = np.stack(
-        resized_frames,
+        frames,
         axis=0,
     )
 
+    # T,H,W,C -> T,C,H,W
     context = torch.from_numpy(
         video_array
     ).permute(
@@ -215,6 +172,7 @@ def _prepare_context(source_video):
         2,
     )
 
+    # T,C,H,W -> B,T,C,H,W
     context = context.unsqueeze(0)
 
     context = context.to(
@@ -237,42 +195,25 @@ def extend_video(
     seed: int = 0,
 ):
     """
-    Extend the END of an existing video using AnyFlow-FAR.
+    Extend an existing video using AnyFlow-FAR V2V.
 
-    Workflow:
-
-        Existing video
-              |
-              v
-        Last 33 frames
-              |
-              v
-        AnyFlow-FAR V2V
-              |
-              v
-        81-frame continuation window
-              |
-              v
-        Remove the 33-frame overlap
-              |
-              v
-        Append ~48 new frames
-              |
-              v
-        Full extended MP4
-
-    NOTE:
-    extension_frames is retained in the function signature so
-    the existing app.py interface does not need to change.
-
-    The released AnyFlow-FAR checkpoint generates 81-frame
-    windows. We therefore use the first 33 frames as context
-    and append the remaining 48 generated frames.
+    Existing video
+          |
+          v
+    final 33 frames
+          |
+          v
+    AnyFlow-FAR
+          |
+          v
+    81-frame generation window
+          |
+          v
+    discard 33-frame conditioning overlap
+          |
+          v
+    append 48 new frames
     """
-
-    # --------------------------------------------------------
-    # INPUT VALIDATION
-    # --------------------------------------------------------
 
     if not video_path:
         raise ValueError(
@@ -291,9 +232,7 @@ def extend_video(
             f"Video file not found: {video_path}"
         )
 
-    print(
-        "=================================================="
-    )
+    print("=" * 58)
 
     print(
         "[ANYFLOW] Starting video extension."
@@ -327,7 +266,7 @@ def extend_video(
     )
 
     # --------------------------------------------------------
-    # LOAD SOURCE VIDEO
+    # LOAD VIDEO
     # --------------------------------------------------------
 
     print(
@@ -353,24 +292,23 @@ def extend_video(
     if source_count < ANYFLOW_CONTEXT_FRAMES:
         raise ValueError(
             "The source video is too short. "
-            f"AnyFlow requires at least "
-            f"{ANYFLOW_CONTEXT_FRAMES} frames."
+            f"At least {ANYFLOW_CONTEXT_FRAMES} "
+            "frames are required."
         )
 
     # --------------------------------------------------------
-    # LOAD PIPELINE
+    # LOAD MODEL
     # --------------------------------------------------------
 
     pipeline = _get_pipeline()
 
     # --------------------------------------------------------
-    # PREPARE V2V CONTEXT
+    # PREPARE CONTEXT
     # --------------------------------------------------------
 
     print(
         "[ANYFLOW] Preparing final "
-        f"{ANYFLOW_CONTEXT_FRAMES} frames "
-        "for V2V conditioning..."
+        f"{ANYFLOW_CONTEXT_FRAMES} frames..."
     )
 
     context = _prepare_context(
@@ -382,12 +320,8 @@ def extend_video(
         f"{tuple(context.shape)}"
     )
 
-    # Expected:
-
-    # (1, 33, 3, 480, 832)
-
     # --------------------------------------------------------
-    # SEED
+    # GENERATOR
     # --------------------------------------------------------
 
     generator = torch.Generator(
@@ -405,15 +339,15 @@ def extend_video(
     # --------------------------------------------------------
 
     print(
-        "[ANYFLOW] Generating continuation..."
+        "[ANYFLOW] Starting AnyFlow-FAR V2V..."
     )
 
     print(
-        "[ANYFLOW] Using V2V conditioning."
+        "[ANYFLOW] Using KV cache."
     )
 
     print(
-        "[ANYFLOW] Generating 81-frame window..."
+        "[ANYFLOW] Using mean velocity."
     )
 
     with torch.inference_mode():
@@ -426,21 +360,20 @@ def extend_video(
             height=ANYFLOW_HEIGHT,
             num_frames=ANYFLOW_OUTPUT_FRAMES,
             num_inference_steps=ANYFLOW_STEPS,
-            guidance_scale=1.0,
             use_mean_velocity=True,
             use_kv_cache=True,
             generator=generator,
         )
 
     # --------------------------------------------------------
-    # EXTRACT GENERATED FRAMES
+    # OUTPUT
     # --------------------------------------------------------
 
     generated_frames = result.frames[0]
 
     if generated_frames is None:
         raise RuntimeError(
-            "AnyFlow returned no video frames."
+            "AnyFlow returned no frames."
         )
 
     if len(generated_frames) == 0:
@@ -454,26 +387,26 @@ def extend_video(
     )
 
     # --------------------------------------------------------
-    # CALCULATE ACTUAL EXTENSION
+    # REMOVE CONDITIONING OVERLAP
     # --------------------------------------------------------
 
     new_frames = generated_frames[
         ANYFLOW_CONTEXT_FRAMES:
     ]
 
-    if len(new_frames) == 0:
+    if not new_frames:
         raise RuntimeError(
-            "AnyFlow produced no new frames after "
-            "the conditioning section."
+            "No new frames remained after removing "
+            "the conditioning overlap."
         )
 
     print(
-        f"[ANYFLOW] New continuation frames: "
+        f"[ANYFLOW] New frames: "
         f"{len(new_frames)}"
     )
 
     print(
-        f"[ANYFLOW] New continuation duration: "
+        f"[ANYFLOW] Added duration: "
         f"{len(new_frames) / ANYFLOW_FPS:.2f} seconds"
     )
 
@@ -484,6 +417,7 @@ def extend_video(
     original_frames = []
 
     for frame in source_video:
+
         frame = frame.resize(
             (
                 ANYFLOW_WIDTH,
@@ -496,14 +430,7 @@ def extend_video(
         )
 
     # --------------------------------------------------------
-    # COMBINE
-    #
-    # Keep the ENTIRE original video.
-    #
-    # Append only the newly generated frames.
-    #
-    # This prevents the 33-frame conditioning section
-    # from being duplicated in the final MP4.
+    # APPEND ONLY NEW FRAMES
     # --------------------------------------------------------
 
     final_frames = (
@@ -512,7 +439,7 @@ def extend_video(
     )
 
     print(
-        f"[ANYFLOW] Final frame count: "
+        f"[ANYFLOW] Final frames: "
         f"{len(final_frames)}"
     )
 
@@ -522,7 +449,7 @@ def extend_video(
     )
 
     # --------------------------------------------------------
-    # SAVE OUTPUT
+    # EXPORT
     # --------------------------------------------------------
 
     output_dir = Path(
@@ -550,12 +477,10 @@ def extend_video(
     )
 
     print(
-        f"[ANYFLOW] Video saved to: "
+        f"[ANYFLOW] Video saved: "
         f"{output_path}"
     )
 
-    print(
-        "=================================================="
-    )
+    print("=" * 58)
 
     return str(output_path)
