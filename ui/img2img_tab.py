@@ -19,15 +19,6 @@ def build():
            GUNS AI STUDIO — IMG2IMG
            ======================================================== */
 
-        html,
-        body {
-            overflow-y: auto !important;
-        }
-
-        .gradio-container {
-            overflow-y: auto !important;
-        }
-
         .guns-img2img {
             width: 100% !important;
             max-width: 1250px !important;
