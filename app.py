@@ -39,7 +39,7 @@ def build_app() -> gr.Blocks:
         margin: 10px 0 25px 0;
     ">
         <img
-            src="file=assets/guns_logo.png"
+            src="/gradio_api/file=assets/guns_logo.png"
             style="
                 width: 90px;
                 height: 90px;
