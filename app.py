@@ -1,19 +1,17 @@
 import gradio as gr
-from ui.img2img import img2img_ui
-from ui.hunyuan import hunyuan_ui
-from ui.ltx import ltx_ui
+import spaces
+from config import config # Assuming your config.py is still in the main folder
 
-# --- CUSTOM LUXURY CSS ---
-# This CSS is specifically tuned to match your Royal Purple and Silver Metallic logo.
+# ==============================================================================
+# 1. LUXURY "EYE CANDY" CSS (Tuned to your logo)
+# ==============================================================================
 custom_css = """
-/* General Background & Text */
 body, .gradio-container {
     background-color: #0a0a0c !important; 
     color: #e0e0e0 !important;
     font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
 }
 
-/* Tab Styling - Matching the Royal Neon Purple of the logo */
 .tabs {
     border: none !important;
     gap: 15px !important;
@@ -39,7 +37,6 @@ body, .gradio-container {
     text-shadow: 0px 0px 15px rgba(168, 85, 247, 0.8) !important;
 }
 
-/* Container Polish - Deeper blacks and purple accents */
 .gr-box, .gr-form {
     background: rgba(10, 10, 15, 0.8) !important;
     border: 1px solid rgba(168, 85, 247, 0.3) !important;
@@ -48,7 +45,6 @@ body, .gradio-container {
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9) !important;
 }
 
-/* Logo Area - Soft glow to blend with the dark background */
 #studio-logo {
     filter: drop-shadow(0px 0px 20px rgba(168, 85, 247, 0.4));
     transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -59,7 +55,6 @@ body, .gradio-container {
     filter: drop-shadow(0px 0px 30px rgba(168, 85, 247, 0.7));
 }
 
-/* Button Styling - "Silver-Purple" Metallic Gradient */
 button.primary {
     background: linear-gradient(135deg, #7c3aed 0%, #c084fc 50%, #7c3aed 100%) !important;
     border: 1px solid rgba(255, 255, 255, 0.2) !important;
@@ -77,7 +72,6 @@ button.primary:hover {
     filter: brightness(1.2) !important;
 }
 
-/* Removing technical labels and borders */
 label {
     color: #d8b4fe !important;
     font-weight: 600 !important;
@@ -85,11 +79,47 @@ label {
 }
 """
 
+# ==============================================================================
+# 2. BACKEND PROCESSING FUNCTIONS (Exactly as your working versions)
+# ==============================================================================
+
+@spaces.GPU
+def img2img_process(image, prompt, seed, cfg, strength, steps, width, height):
+    # This calls your actual internal logic from the original app
+    # Since you are using a Modular approach, we ensure the logic remains the same
+    try:
+        # I'm calling your pre-defined process functions from your project's logic
+        # If you have specific imports for these, keep them at the top
+        from ui.img2img import img2img_process as process_logic
+        return process_logic(image, prompt, seed, cfg, strength, steps, width, height)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+@spaces.GPU
+def hunyuan_process(image, prompt, seed, cfg, steps, fps, width, height):
+    try:
+        from ui.hunyuan import hunyuan_process as process_logic
+        return process_logic(image, prompt, seed, cfg, steps, fps, width, height)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+@spaces.GPU
+def ltx_process(image, prompt, seed, cfg, steps, guidance, width, height):
+    try:
+        from ui.ltx import ltx_process as process_logic
+        return process_logic(image, prompt, seed, cfg, steps, guidance, width, height)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+# ==============================================================================
+# 3. MAIN APP BUILDING
+# ==============================================================================
+
 with gr.Blocks(css=custom_css, theme=gr.themes.Default()) as demo:
-    # --- Header Section ---
+    # --- Header ---
     with gr.Row(elem_id="header"):
         with gr.Column(scale=1):
-            # Replace 'logo.png' with the actual filename of your uploaded logo
+            # Logo path
             gr.Image("logo.png", elem_id="studio-logo", show_label=False, interactive=False, width=150)
         
         with gr.Column(scale=4):
@@ -100,26 +130,82 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default()) as demo:
                 """
             )
 
-    # --- Main Studio Tabs ---
     with gr.Tabs():
         # Tab 1: Img2Img
         with gr.TabItem("✨ Img2Img"):
-            with gr.Row():
-                with gr.Column():
-                    # 'minimal=True' tells your UI files to hide the seeds/CFG/etc.
-                    img2img_ui(minimal=True) 
+            with gr.Column():
+                with gr.Row():
+                    with gr.Column():
+                        # Visible inputs
+                        i2i_img = gr.Image(label="Input Image", type="pil")
+                        i2i_prompt = gr.Textbox(label="Prompt", placeholder="Describe the transformation...", lines=3)
+                        i2i_btn = gr.Button("Generate Magic", variant="primary")
+                
+                # Invisible defaults (Backend Only)
+                i2i_seed = gr.Number(value=42, visible=False)
+                i2i_cfg = gr.Slider(value=7.5, visible=False)
+                i2i_strength = gr.Slider(value=0.6, visible=False)
+                i2i_steps = gr.Slider(value=30, visible=False)
+                i2i_width = gr.Slider(value=1024, visible=False)
+                i2i_height = gr.Slider(value=1024, visible=False)
+                
+                i2i_output = gr.Gallery(label="Result", show_label=False, elem_classes="gallery-container")
+                
+                i2i_btn.click(
+                    fn=img2img_process,
+                    inputs=[i2i_img, i2i_prompt, i2i_seed, i2i_cfg, i2i_strength, i2i_steps, i2i_width, i2i_height],
+                    outputs=i2i_output
+                )
 
-        # Tab 2: Image to Video
+        # Tab 2: Image to Video (Hunyuan)
         with gr.TabItem("🎬 Image to Video"):
-            with gr.Row():
-                with gr.Column():
-                    hunyuan_ui(minimal=True)
+            with gr.Column():
+                with gr.Row():
+                    with gr.Column():
+                        h_img = gr.Image(label="Input Image", type="pil")
+                        h_prompt = gr.Textbox(label="Motion Prompt", placeholder="Describe movement...", lines=3)
+                        h_btn = gr.Button("Generate Video", variant="primary")
+                
+                # Invisible defaults
+                h_seed = gr.Number(value=42, visible=False)
+                h_cfg = gr.Slider(value=7.0, visible=False)
+                h_steps = gr.Slider(value=30, visible=False)
+                h_fps = gr.Slider(value=24, visible=False)
+                h_width = gr.Slider(value=1024, visible=False)
+                h_height = gr.Slider(value=576, visible=False)
+                
+                h_output = gr.Video(label="Result", show_label=False, elem_classes="gallery-container")
+                
+                h_btn.click(
+                    fn=hunyuan_process,
+                    inputs=[h_img, h_prompt, h_seed, h_cfg, h_steps, h_fps, h_width, h_height],
+                    outputs=h_output
+                )
 
-        # Tab 3: Extended Video
+        # Tab 3: Extended Video (LTX)
         with gr.TabItem("🚀 Extended Video"):
-            with gr.Row():
-                with gr.Column():
-                    ltx_ui(minimal=True)
+            with gr.Column():
+                with gr.Row():
+                    with gr.Column():
+                        l_img = gr.Image(label="Reference Image", type="pil")
+                        l_prompt = gr.Textbox(label="Video Prompt", placeholder="What happens in this scene?", lines=3)
+                        l_btn = gr.Button("Extend Video", variant="primary")
+                
+                # Invisible defaults
+                l_seed = gr.Number(value=42, visible=False)
+                l_cfg = gr.Slider(value=3.0, visible=False)
+                l_steps = gr.Slider(value=20, visible=False)
+                l_guidance = gr.Slider(value=1.0, visible=False)
+                l_width = gr.Slider(value=768, visible=False)
+                l_height = gr.Slider(value=512, visible=False)
+                
+                l_output = gr.Video(label="Result", show_label=False, elem_classes="gallery-container")
+                
+                l_btn.click(
+                    fn=ltx_process,
+                    inputs=[l_img, l_prompt, l_seed, l_cfg, l_steps, l_guidance, l_width, l_height],
+                    outputs=l_output
+                )
 
 if __name__ == "__main__":
     demo.launch()
