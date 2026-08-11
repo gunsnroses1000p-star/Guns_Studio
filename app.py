@@ -1,10 +1,14 @@
 """
 app.py – Guns AI Studio entrypoint.
 """
-
 import os
+from pathlib import Path
 
 import gradio as gr
+
+gr.set_static_paths(
+    paths=[Path(__file__).parent.absolute() / "assets"]
+)
 
 # ZeroGPU startup compatibility.
 try:
