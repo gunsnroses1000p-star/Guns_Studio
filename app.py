@@ -29,10 +29,33 @@ def build_app() -> gr.Blocks:
         title="Guns AI Studio"
     ) as demo:
 
-        gr.Markdown(
-            """
-            # 🔫 Guns AI Studio
-            """
+        gr.HTML(
+    """
+    <div style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        margin: 10px 0 25px 0;
+    ">
+        <img
+            src="file=assets/guns_logo.png"
+            style="
+                width: 90px;
+                height: 90px;
+                object-fit: contain;
+                border-radius: 12px;
+            "
+        >
+        <h1 style="
+            margin: 0;
+            font-size: 42px;
+            font-weight: 800;
+        ">
+            Guns AI Studio
+        </h1>
+    </div>
+    """
         )
 
         with gr.Tabs():
