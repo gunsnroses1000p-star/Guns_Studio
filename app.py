@@ -1,14 +1,6 @@
-gr.HTML(
-    """
-    <div class="guns-brand-header">
-        <img
-            src="/file=assets/guns_logo.jpg"
-            alt="Guns AI Studio"
-            class="guns-brand-logo"
-        />
-    </div>
-    """
-)
+"""
+app.py – Guns AI Studio entrypoint.
+"""
 
 import os
 
@@ -34,79 +26,102 @@ from ui import extended_video_tab
 def build_app() -> gr.Blocks:
 
     with gr.Blocks(
-    title="Guns AI Studio",
-    css="""
-    .guns-brand-header {
-        width: 100%;
-        max-width: 1250px;
-        margin: 0 auto 18px auto;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 4px 0;
-    }
+        title="Guns AI Studio",
+        css="""
+        /* ========================================================
+           GUNS AI STUDIO — GLOBAL BRANDING
+           ======================================================== */
 
-    .guns-brand-logo {
-        display: block;
-        width: 100%;
-        max-width: 620px;
-        height: auto;
-        object-fit: contain;
-        border: none !important;
-        outline: none !important;
-        box-shadow: none !important;
-        user-select: none;
-        -webkit-user-drag: none;
-    }
-
-    @media (max-width: 768px) {
         .guns-brand-header {
-            margin-bottom: 14px;
-            padding: 2px 8px;
+            width: 100%;
+            max-width: 1250px;
+            margin: 0 auto 18px auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 4px 0;
         }
 
         .guns-brand-logo {
-            max-width: 100%;
+            display: block;
+            width: 100%;
+            max-width: 620px;
+            height: auto;
+            object-fit: contain;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            user-select: none;
+            -webkit-user-drag: none;
+            pointer-events: none;
         }
-    }
-    """
-) as demo:
 
+        /* ========================================================
+           MOBILE — BRANDING ONLY
+           ======================================================== */
 
-        gr.Markdown(
+        @media (max-width: 768px) {
+
+            .guns-brand-header {
+                margin-bottom: 14px;
+                padding: 2px 8px;
+            }
+
+            .guns-brand-logo {
+                max-width: 100%;
+            }
+        }
+        """
+    ) as demo:
+
+        # ========================================================
+        # GUNS AI STUDIO LOGO
+        #
+        # Plain HTML image — NOT gr.Image.
+        # This prevents Gradio Edit / Share controls.
+        # ========================================================
+
+        gr.HTML(
             """
-            # 🔫 Guns AI Studio
+            <div class="guns-brand-header">
+                <img
+                    src="/file=assets/guns_logo.jpg"
+                    alt="Guns AI Studio"
+                    class="guns-brand-logo"
+                />
+            </div>
             """
         )
 
+        # ========================================================
+        # MAIN TABS
+        # ========================================================
+
         with gr.Tabs():
 
-            # =================================================
-            # IMG2IMG
-            # =================================================
+            # ====================================================
+            # IMAGE — IMG2IMG
+            # ====================================================
 
             with gr.Tab("🖌️ Img2Img"):
 
                 img2img_tab.build()
 
-
-            # =================================================
-            # IMAGE TO VIDEO — HUNYUAN
-            # =================================================
+            # ====================================================
+            # VIDEO — IMAGE TO VIDEO
+            # ====================================================
 
             with gr.Tab("🎥 Image to Video"):
 
                 image_to_video_tab.build()
 
-
-            # =================================================
-            # EXTENDED VIDEO — LTX
-            # =================================================
+            # ====================================================
+            # EXTENDED VIDEO — LTX TEST
+            # ====================================================
 
             with gr.Tab("⏩ Extended Video"):
 
                 extended_video_tab.build()
-
 
     return demo
 
