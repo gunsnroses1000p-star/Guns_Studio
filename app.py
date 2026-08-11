@@ -1,16 +1,26 @@
 """
 app.py – Guns AI Studio entrypoint.
 """
+
 import os
 from pathlib import Path
 
 import gradio as gr
 
+
+# ============================================================
+# STATIC ASSETS
+# ============================================================
+
 gr.set_static_paths(
     paths=[Path(__file__).parent.absolute() / "assets"]
 )
 
-# ZeroGPU startup compatibility.
+
+# ============================================================
+# ZEROGPU STARTUP COMPATIBILITY
+# ============================================================
+
 try:
     import spaces
 
@@ -22,77 +32,187 @@ except ImportError:
     pass
 
 
+# ============================================================
+# TAB MODULES
+# ============================================================
+
 from ui import img2img_tab
 from ui import image_to_video_tab
 from ui import extended_video_tab
 
 
+# ============================================================
+# CUSTOM UI STYLE
+# ============================================================
+
+CUSTOM_CSS = """
+/* ============================================================
+   GUNS AI STUDIO - MAIN BRAND
+   ============================================================ */
+
+.guns-brand {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 28px 20px 20px 20px;
+    box-sizing: border-box;
+}
+
+.guns-logo {
+    width: 210px;
+    height: 210px;
+    object-fit: contain;
+    display: block;
+}
+
+
+/* ============================================================
+   THREE-TAB NAVIGATION
+   ============================================================ */
+
+#guns-tabs .tab-nav {
+    width: 100%;
+    display: flex !important;
+    align-items: stretch;
+    justify-content: center;
+    margin: 10px auto 28px auto;
+    padding: 0;
+    border: 1px solid rgba(180, 80, 255, 0.25);
+    border-radius: 18px;
+    overflow: hidden;
+    background: rgba(10, 8, 18, 0.72);
+}
+
+#guns-tabs .tab-nav button {
+    flex: 1 1 33.333%;
+    min-height: 72px;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #b8b5c4 !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease;
+}
+
+#guns-tabs .tab-nav button:hover {
+    color: #ffffff !important;
+    background: rgba(150, 60, 255, 0.10) !important;
+}
+
+#guns-tabs .tab-nav button.selected {
+    color: #d678ff !important;
+    background: linear-gradient(
+        180deg,
+        rgba(150, 60, 255, 0.20),
+        rgba(80, 20, 120, 0.10)
+    ) !important;
+    box-shadow:
+        inset 0 -3px 0 #c45cff,
+        inset 0 0 25px rgba(170, 70, 255, 0.10);
+}
+
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 700px) {
+
+    .guns-brand {
+        padding: 20px 10px 12px 10px;
+    }
+
+    .guns-logo {
+        width: 155px;
+        height: 155px;
+    }
+
+    #guns-tabs .tab-nav {
+        border-radius: 14px;
+        margin-top: 8px;
+        margin-bottom: 22px;
+    }
+
+    #guns-tabs .tab-nav button {
+        min-height: 62px;
+        padding: 8px 4px !important;
+        font-size: 14px !important;
+        line-height: 1.2 !important;
+    }
+}
+"""
+
+
+# ============================================================
+# BUILD APP
+# ============================================================
+
 def build_app() -> gr.Blocks:
 
     with gr.Blocks(
-        title="Guns AI Studio"
+        title="Guns AI Studio",
+        css=CUSTOM_CSS,
     ) as demo:
 
+        # ====================================================
+        # CENTERED LOGO
+        # ====================================================
+
         gr.HTML(
-    """
-    <div style="
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 18px;
-        margin: 10px 0 25px 0;
-    ">
-        <img
-            src="/gradio_api/file=assets/guns_logo.png"
-            style="
-                width: 90px;
-                height: 90px;
-                object-fit: contain;
-                border-radius: 12px;
-            "
-        >
-        <h1 style="
-            margin: 0;
-            font-size: 42px;
-            font-weight: 800;
-        ">
-            Guns AI Studio
-        </h1>
-    </div>
-    """
+            """
+            <div class="guns-brand">
+                <img
+                    class="guns-logo"
+                    src="/gradio_api/file=assets/guns_logo.png"
+                    alt="Guns AI Studio"
+                >
+            </div>
+            """
         )
 
-        with gr.Tabs():
 
-            # =================================================
+        # ====================================================
+        # MAIN THREE-TAB NAVIGATION
+        # ====================================================
+
+        with gr.Tabs(elem_id="guns-tabs"):
+
+            # ------------------------------------------------
             # IMG2IMG
-            # =================================================
+            # ------------------------------------------------
 
             with gr.Tab("🖌️ Img2Img"):
 
                 img2img_tab.build()
 
 
-            # =================================================
-            # IMAGE TO VIDEO — HUNYUAN
-            # =================================================
+            # ------------------------------------------------
+            # IMAGE TO VIDEO
+            # ------------------------------------------------
 
-            with gr.Tab("🎥 Image to Video"):
+            with gr.Tab("🎥 Image → Video"):
 
                 image_to_video_tab.build()
 
 
-            # =================================================
-            # EXTENDED VIDEO — LTX
-            # =================================================
+            # ------------------------------------------------
+            # EXTENDED VIDEO
+            # ------------------------------------------------
 
-            with gr.Tab("⏩ Extended Video"):
+            with gr.Tab("🎞️ Extended Video"):
 
                 extended_video_tab.build()
 
 
     return demo
 
+
+# ============================================================
+# LAUNCH
+# ============================================================
 
 if __name__ == "__main__":
 
