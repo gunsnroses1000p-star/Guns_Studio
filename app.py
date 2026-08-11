@@ -152,14 +152,146 @@ CUSTOM_CSS = """
 
 def build_app() -> gr.Blocks:
 
+    CUSTOM_CSS = """
+    /* =========================================================
+       GUNS AI STUDIO LOGO
+       ========================================================= */
+
+    .guns-brand {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px 10px 18px 10px;
+        box-sizing: border-box;
+    }
+
+    .guns-logo {
+        width: 180px;
+        height: 180px;
+        object-fit: contain;
+        display: block;
+    }
+
+
+    /* =========================================================
+       THREE-TAB BANNER
+       ========================================================= */
+
+    #guns-tabs .tab-nav {
+        width: 100%;
+        display: flex !important;
+        align-items: stretch;
+        justify-content: center;
+
+        margin: 8px auto 28px auto;
+        padding: 0;
+
+        border: 1px solid rgba(180, 80, 255, 0.30);
+        border-radius: 16px;
+
+        overflow: hidden;
+
+        background: rgba(12, 10, 20, 0.85);
+    }
+
+
+    /* Individual tabs */
+
+    #guns-tabs .tab-nav button {
+        flex: 1 1 33.333%;
+
+        min-height: 68px;
+
+        margin: 0 !important;
+        padding: 10px 12px !important;
+
+        border: none !important;
+        border-radius: 0 !important;
+
+        background: transparent !important;
+
+        color: #b8b5c4 !important;
+
+        font-size: 17px !important;
+        font-weight: 600 !important;
+
+        transition:
+            background 0.2s ease,
+            color 0.2s ease,
+            box-shadow 0.2s ease;
+    }
+
+
+    /* Hover */
+
+    #guns-tabs .tab-nav button:hover {
+        color: #ffffff !important;
+
+        background: rgba(150, 60, 255, 0.12) !important;
+    }
+
+
+    /* =========================================================
+       ACTIVE TAB = PURPLE
+       ========================================================= */
+
+    #guns-tabs .tab-nav button.selected {
+        color: #ffffff !important;
+
+        background: linear-gradient(
+            180deg,
+            rgba(150, 60, 255, 0.48),
+            rgba(95, 25, 150, 0.30)
+        ) !important;
+
+        box-shadow:
+            inset 0 -3px 0 #c45cff,
+            inset 0 0 25px rgba(180, 70, 255, 0.18);
+    }
+
+
+    /* =========================================================
+       MOBILE
+       ========================================================= */
+
+    @media (max-width: 700px) {
+
+        .guns-brand {
+            padding: 16px 8px 14px 8px;
+        }
+
+        .guns-logo {
+            width: 165px;
+            height: 165px;
+        }
+
+        #guns-tabs .tab-nav {
+            margin-top: 6px;
+            margin-bottom: 22px;
+            border-radius: 14px;
+        }
+
+        #guns-tabs .tab-nav button {
+            min-height: 60px;
+
+            padding: 8px 4px !important;
+
+            font-size: 13px !important;
+            line-height: 1.15 !important;
+        }
+    }
+    """
+
+
     with gr.Blocks(
         title="Guns AI Studio",
         css=CUSTOM_CSS,
     ) as demo:
 
-        # ====================================================
+        # =====================================================
         # CENTERED LOGO
-        # ====================================================
+        # =====================================================
 
         gr.HTML(
             """
@@ -174,40 +306,42 @@ def build_app() -> gr.Blocks:
         )
 
 
-        # ====================================================
-        # MAIN THREE-TAB NAVIGATION
-        # ====================================================
+        # =====================================================
+        # THREE WORKING TABS
+        # =====================================================
 
         with gr.Tabs(elem_id="guns-tabs"):
 
-            # ------------------------------------------------
-            # IMG2IMG
-            # ------------------------------------------------
+            # =================================================
+            # IMG2IMG — DO NOT CHANGE
+            # =================================================
 
             with gr.Tab("🖌️ Img2Img"):
 
                 img2img_tab.build()
 
 
-            # ------------------------------------------------
-            # IMAGE TO VIDEO
-            # ------------------------------------------------
+            # =================================================
+            # IMAGE TO VIDEO — DO NOT CHANGE
+            # =================================================
 
-            with gr.Tab("🎥 Image → Video"):
+            with gr.Tab("🎥 Image to Video"):
 
                 image_to_video_tab.build()
 
 
-            # ------------------------------------------------
-            # EXTENDED VIDEO
-            # ------------------------------------------------
+            # =================================================
+            # EXTENDED VIDEO — DO NOT CHANGE
+            # =================================================
 
-            with gr.Tab("🎞️ Extended Video"):
+            with gr.Tab("⏩ Extended Video"):
 
                 extended_video_tab.build()
 
 
     return demo
+
+
 
 
 # ============================================================
