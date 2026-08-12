@@ -223,7 +223,7 @@ def build_app() -> gr.Blocks:
     }
     """
 
-    ) as demo:
+    )as demo:
 
         # ========================================================
         # GUNS AI STUDIO LOGO
@@ -232,7 +232,7 @@ def build_app() -> gr.Blocks:
         # This prevents Gradio Edit / Share controls.
         # ========================================================
 
-        gr.HTML(
+    gr.HTML(
             """
             <div class="guns-brand-header">
                 <img
@@ -248,7 +248,7 @@ def build_app() -> gr.Blocks:
         # MAIN TABS
         # ========================================================
 
-        with gr.Tabs():
+    with gr.Tabs():
 
             # ====================================================
             # IMAGE — IMG2IMG
