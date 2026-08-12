@@ -25,9 +25,9 @@ from ui import extended_video_tab
 
 def build_app() -> gr.Blocks:
 
-    CUSTOM_CSS = """
+   CUSTOM_CSS = """
     /* =========================================================
-       GUNS AI STUDIO — PURPLE + BLACK THEME
+       GUNS AI STUDIO — PURPLE + BLACK TAB UI
        ========================================================= */
 
     .guns-brand {
@@ -49,7 +49,6 @@ def build_app() -> gr.Blocks:
 
     /* =========================================================
        THREE-TAB NAVIGATION
-       Existing Gradio tabs — styling only
        ========================================================= */
 
     #guns-tabs .tab-nav {
@@ -61,130 +60,148 @@ def build_app() -> gr.Blocks:
         margin: 8px auto 28px auto;
         padding: 0;
 
-        border: 1px solid #7c3aed;
-        border-radius: 16px;
+        background: #050505 !important;
+        border: 1px solid #2b1645 !important;
+        border-radius: 14px;
 
         overflow: hidden;
-
-        background: #000000;
     }
 
 
     /* =========================================================
-       INDIVIDUAL TABS
+       ALL TABS — BLACK
        ========================================================= */
 
-    #guns-tabs .tab-nav button {
+    #guns-tabs .tab-nav button,
+    #guns-tabs .tab-nav button[role="tab"] {
+        position: relative;
+
         flex: 1 1 33.333%;
 
-        min-height: 64px;
+        min-height: 60px;
 
         margin: 0 !important;
-        padding: 10px 8px !important;
+        padding: 8px 8px !important;
 
-        border: none !important;
+        border: 0 !important;
         border-radius: 0 !important;
 
-        background: #000000 !important;
+        background: #050505 !important;
+        background-image: none !important;
 
-        color: #a855f7 !important;
+        color: #ffffff !important;
 
-        font-size: 16px !important;
-        font-weight: 700 !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+
+        box-shadow: none !important;
+        text-shadow: none !important;
 
         transition:
-            background 0.2s ease,
-            color 0.2s ease,
-            box-shadow 0.2s ease;
+            background 0.18s ease,
+            color 0.18s ease;
     }
 
 
     /* =========================================================
-       HOVER
+       REMOVE GRADIO'S DEFAULT ACTIVE UNDERLINE
+       ========================================================= */
+
+    #guns-tabs .tab-nav button::after,
+    #guns-tabs .tab-nav button.selected::after,
+    #guns-tabs .tab-nav button[aria-selected="true"]::after {
+        display: none !important;
+        content: none !important;
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+    }
+
+
+    /* =========================================================
+       ACTIVE TAB — PURPLE
+       ========================================================= */
+
+    #guns-tabs .tab-nav button.selected,
+    #guns-tabs .tab-nav button[aria-selected="true"] {
+        background: #7c3aed !important;
+        background-image: none !important;
+
+        color: #ffffff !important;
+
+        border: 0 !important;
+        border-bottom: 0 !important;
+
+        box-shadow: none !important;
+        text-shadow: none !important;
+    }
+
+
+    /* =========================================================
+       HOVER — KEEP IT PURPLE/BLACK ONLY
        ========================================================= */
 
     #guns-tabs .tab-nav button:hover {
-        background: #7c3aed !important;
-        color: #000000 !important;
+        background: #160d22 !important;
+        color: #ffffff !important;
+    }
+
+    #guns-tabs .tab-nav button.selected:hover,
+    #guns-tabs .tab-nav button[aria-selected="true"]:hover {
+        background: #8b5cf6 !important;
+        color: #ffffff !important;
     }
 
 
     /* =========================================================
-       ACTIVE TAB
-       PURPLE BACKGROUND / BLACK TEXT
+       GENERIC SVG ICONS
        ========================================================= */
 
-    #guns-tabs .tab-nav button.selected {
-        background: #7c3aed !important;
-        color: #000000 !important;
+    #guns-tabs .tab-nav button::before {
+        content: "";
+        display: inline-block;
 
-        box-shadow:
-            inset 0 -4px 0 #000000;
+        width: 18px;
+        height: 18px;
+
+        margin-right: 7px;
+
+        vertical-align: -4px;
+
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: contain;
+
+        opacity: 0.95;
     }
 
 
-    /* =========================================================
-       SVG-STYLE GENERIC ICONS
-       CSS ONLY — DOES NOT CHANGE TAB FUNCTIONALITY
-       ========================================================= */
+    /* Img2Img — image icon */
 
-    #guns-tabs .tab-nav button {
-        display: flex !important;
-        align-items: center;
-        justify-content: center;
-        gap: 7px;
-    }
-
-    /* Hide the original Unicode emoji while keeping the label text */
-    #guns-tabs .tab-nav button {
-        font-size: 0 !important;
-    }
-
-    #guns-tabs .tab-nav button::after {
-        font-size: 16px;
-        font-weight: 700;
-    }
-
-    /* Img2Img */
     #guns-tabs .tab-nav button:nth-child(1)::before {
-        content: "";
-        width: 22px;
-        height: 22px;
-        flex: 0 0 22px;
-
-        background-color: currentColor;
-
-        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='3' width='18' height='18' rx='3' fill='none' stroke='black' stroke-width='2'/%3E%3Ccircle cx='8.5' cy='8.5' r='1.5' fill='black'/%3E%3Cpath d='M4 17l5-5 3 3 2-2 6 6' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") center / contain no-repeat;
-
-        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='3' width='18' height='18' rx='3' fill='none' stroke='black' stroke-width='2'/%3E%3Ccircle cx='8.5' cy='8.5' r='1.5' fill='black'/%3E%3Cpath d='M4 17l5-5 3 3 2-2 6 6' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") center / contain no-repeat;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c084fc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='3'/%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'/%3E%3Cpath d='m21 15-5-5L5 21'/%3E%3C/svg%3E");
     }
 
-    /* Image → Video */
+
+    /* Image to Video — video/play icon */
+
     #guns-tabs .tab-nav button:nth-child(2)::before {
-        content: "";
-        width: 22px;
-        height: 22px;
-        flex: 0 0 22px;
-
-        background-color: currentColor;
-
-        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='5' width='14' height='14' rx='2' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='M16 9l6-3v12l-6-3z' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") center / contain no-repeat;
-
-        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='5' width='14' height='14' rx='2' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='M16 9l6-3v12l-6-3z' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") center / contain no-repeat;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c084fc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='15' height='14' rx='2'/%3E%3Cpath d='m18 10 3-2v8l-3-2z'/%3E%3Cpath d='m10 9 4 3-4 3z' fill='%23c084fc' stroke='none'/%3E%3C/svg%3E");
     }
 
-    /* Extended Video */
+
+    /* Extended Video — fast-forward icon */
+
     #guns-tabs .tab-nav button:nth-child(3)::before {
-        content: "";
-        width: 22px;
-        height: 22px;
-        flex: 0 0 22px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c084fc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 5 7 7-7 7z'/%3E%3Cpath d='m12 5 7 7-7 7z'/%3E%3C/svg%3E");
+    }
 
-        background-color: currentColor;
 
-        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 5l7 7-7 7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 5l7 7-7 7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    /* Active icons become white */
 
-        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 5l7 7-7 7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 5l7 7-7 7' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    #guns-tabs .tab-nav button.selected::before,
+    #guns-tabs .tab-nav button[aria-selected="true"]::before {
+        filter: brightness(0) invert(1);
     }
 
 
@@ -206,19 +223,25 @@ def build_app() -> gr.Blocks:
         #guns-tabs .tab-nav {
             margin-top: 6px;
             margin-bottom: 22px;
-            border-radius: 14px;
+
+            border-radius: 12px;
         }
 
-        #guns-tabs .tab-nav button {
+        #guns-tabs .tab-nav button,
+        #guns-tabs .tab-nav button[role="tab"] {
             min-height: 58px;
-            padding: 8px 3px !important;
-            gap: 5px;
+
+            padding: 7px 3px !important;
+
+            font-size: 12px !important;
+            line-height: 1.15 !important;
         }
 
         #guns-tabs .tab-nav button::before {
-            width: 19px;
-            height: 19px;
-            flex-basis: 19px;
+            width: 17px;
+            height: 17px;
+
+            margin-right: 4px;
         }
     }
     """
